@@ -18,6 +18,9 @@
   <link rel="stylesheet" href="https://s1.hdslb.com/bfs/static/jinkela/long/font/regular.css" />
   <!-- IE Out -->
   <script>
+    document.addEventListener('contextmenu', function (event) {
+      event.preventDefault();
+    });
     if (
       /*@cc_on!@*/
       false ||
@@ -58,7 +61,7 @@
     <p class="title">%VITE_SITE_TITLE%</p>
     <p class="tip">请开启 JavaScript | Please enable JavaScript to use this site</p>
   </noscript>
-  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="/src/main.ts"></script>
 </body>
 
 </html>

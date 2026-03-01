@@ -4,7 +4,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { userStore } from "@/store";
 import { useI18n } from "vue-i18n";
 import CoverLists from "@/components/DataList/CoverLists.vue";
@@ -14,7 +14,6 @@ const user = userStore();
 
 onMounted(() => {
   $setSiteTitle(t("nav.user") + " - " + t("nav.userChildren.like"));
-  if (!user.getUserPlayLists.has && !user.getUserPlayLists.isLoading)
-    user.setUserPlayLists();
+  if (!user.getUserPlayLists.has && !user.getUserPlayLists.isLoading) user.setUserPlayLists();
 });
 </script>

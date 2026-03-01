@@ -1,14 +1,15 @@
 <template>
   <div class="artists">
-    <ArtistLists :listData="searchData" />
+    <ArtistLists :listData="searchData" :loading="loading" />
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { getSearchData } from "@/api/search";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import ArtistLists from "@/components/DataList/ArtistLists.vue";
+import type { SearchType } from "@/api";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -16,12 +17,14 @@ const router = useRouter();
 // 搜索数据
 const searchKeywords = ref(router.currentRoute.value.query.keywords);
 const searchData = ref([]);
+const loading = ref(true);
 const pagelimit = ref(30);
 const pageNumber = ref(1);
 const totalCount = ref(0);
 
 // 获取搜索数据
-const getSearchDataList = (keywords, limit = 30, offset = 0, type = 100) => {
+const getSearchDataList = (keywords, limit = 30, offset = 0, type: SearchType = 100) => {
+  loading.value = true;
   getSearchData(keywords, limit, offset, type).then((res) => {
     console.log(res);
     // 数据总数
@@ -37,8 +40,9 @@ const getSearchDataList = (keywords, limit = 30, offset = 0, type = 100) => {
         });
       });
     } else {
-      $message.error(t("general.message.acquisitionFailed"));
+      $message.info(t("nav.search.noSuggestions"));
     }
+    loading.value = false;
     // 请求后回顶
     if (typeof $scrollToTop !== "undefined") $scrollToTop();
   });
@@ -53,10 +57,10 @@ watch(
       getSearchDataList(
         searchKeywords.value,
         pagelimit.value,
-        (pageNumber.value - 1) * pagelimit.value
+        (pageNumber.value - 1) * pagelimit.value,
       );
     }
-  }
+  },
 );
 
 onMounted(() => {

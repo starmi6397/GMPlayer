@@ -16,12 +16,7 @@
         <n-text class="tip" v-html="$t('nav.userChildren.results')" />
       </div>
     </div>
-    <n-tabs
-      class="main-tab"
-      type="line"
-      @update:value="tabChange"
-      v-model:value="tabValue"
-    >
+    <n-tabs class="main-tab" type="line" @update:value="tabChange" v-model:value="tabValue">
       <n-tab name="playlists">{{ $t("nav.userChildren.playlist") }}</n-tab>
       <n-tab name="like">{{ $t("nav.userChildren.like") }}</n-tab>
       <n-tab name="album">{{ $t("nav.userChildren.album") }}</n-tab>
@@ -30,29 +25,38 @@
     </n-tabs>
     <main class="content">
       <router-view v-slot="{ Component }">
-        <keep-alive>
-          <Transition name="move" mode="out-in">
+        <Transition :name="transitionName" mode="out-in">
+          <keep-alive>
             <component :is="Component" />
-          </Transition>
-        </keep-alive>
+          </keep-alive>
+        </Transition>
       </router-view>
     </main>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { userStore } from "@/store";
 import { useRouter } from "vue-router";
+import { useTabTransition } from "@/composables/useTabTransition";
 
 const router = useRouter();
 const user = userStore();
+const { transitionName, updateDirection, syncIndex } = useTabTransition([
+  "playlists",
+  "like",
+  "album",
+  "artists",
+  "cloud",
+]);
 
 // Tab 默认选中
 const tabValue = ref(router.currentRoute.value.path.split("/")[2]);
+syncIndex(tabValue.value);
 
 // Tab 选项卡变化
 const tabChange = (value) => {
-  console.log(value);
+  updateDirection(value);
   router.push({
     path: `/user/${value}`,
   });
@@ -63,7 +67,8 @@ watch(
   () => router.currentRoute.value,
   (val) => {
     tabValue.value = val.path.split("/")[2];
-  }
+    syncIndex(tabValue.value);
+  },
 );
 </script>
 
@@ -108,18 +113,9 @@ watch(
     }
   }
   .content {
+    position: relative;
+    overflow: hidden;
     margin-top: 20px;
   }
-}
-// 路由跳转动画
-.move-enter-active,
-.move-leave-active {
-  transition: all 0.2s ease;
-}
-
-.move-enter-from,
-.move-leave-to {
-  opacity: 0;
-  transform: translateX(10px);
 }
 </style>

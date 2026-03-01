@@ -6,19 +6,11 @@
     <div class="title" v-else>
       <span class="key">{{ $t("other.noHistory") }}</span>
       <br />
-      <n-button
-        strong
-        secondary
-        @click="router.go(-1)"
-        style="margin-top: 20px"
-      >
+      <n-button strong secondary @click="router.go(-1)" style="margin-top: 20px">
         {{ $t("general.name.goBack") }}
       </n-button>
     </div>
-    <DataLists
-      v-if="music.getPlayHistory[0]"
-      :listData="music.getPlayHistory"
-    />
+    <DataLists v-if="music.getPlayHistory[0]" :listData="music.getPlayHistory" />
     <n-divider v-if="music.getPlayHistory[0]" class="tip" dashed>
       <n-text :depth="3" style="font-size: 12px">
         {{ $t("other.justShow", { num: 100 }) }}
@@ -27,7 +19,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { musicStore } from "@/store";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";

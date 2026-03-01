@@ -9,6 +9,7 @@
         :collapsed="gridCollapsed"
         :collapsed-rows="gridCollapsedRows"
         v-if="listData[0]"
+        key="data"
       >
         <n-gi
           class="item"
@@ -50,8 +51,10 @@
           </n-text>
         </n-gi>
       </n-grid>
+      <n-empty v-else-if="loading === false" key="empty" class="empty" />
       <n-grid
         v-else
+        key="loading"
         class="loading"
         x-gap="20"
         y-gap="26"
@@ -115,6 +118,11 @@ const props = defineProps({
     type: Number,
     default: 6,
   },
+  // 加载状态（null=旧行为，false=加载完成可显示空状态）
+  loading: {
+    type: Boolean,
+    default: null,
+  },
 });
 
 // 弹窗数据
@@ -131,7 +139,7 @@ const renderIcon = (icon) => {
       { style: { transform: "translateX(2px)" } },
       {
         default: () => icon,
-      }
+      },
     );
   };
 };
@@ -166,9 +174,7 @@ const openRightMenu = (e, data) => {
           onClick: () => {
             if (navigator.clipboard) {
               try {
-                navigator.clipboard.writeText(
-                  `https://music.163.com/#/artist?id=${data.id}`
-                );
+                navigator.clipboard.writeText(`https://music.163.com/#/artist?id=${data.id}`);
                 $message.success(t("general.message.copySuccess"));
               } catch (err) {
                 console.error(t("general.message.copyFailure"), err);
@@ -203,7 +209,7 @@ const toLikeArtist = (data) => {
           type == 1
             ? t("menu.collection", { name: t("general.dialog.success") })
             : t("menu.cancelCollection", { name: t("general.dialog.success") })
-        }`
+        }`,
       );
       user.setUserArtistLists();
     } else {
@@ -212,7 +218,7 @@ const toLikeArtist = (data) => {
           type == 1
             ? t("menu.collection", { name: t("general.dialog.failed") })
             : t("menu.cancelCollection", { name: t("general.dialog.failed") })
-        }`
+        }`,
       );
     }
   });
@@ -227,11 +233,7 @@ const isLikeOrDislike = (id) => {
 };
 
 onMounted(() => {
-  if (
-    user.userLogin &&
-    !user.getUserArtistLists.has &&
-    !user.getUserArtistLists.isLoading
-  )
+  if (user.userLogin && !user.getUserArtistLists.has && !user.getUserArtistLists.isLoading)
     user.setUserArtistLists();
 });
 </script>
@@ -344,6 +346,9 @@ onMounted(() => {
       border-radius: 50% !important;
       margin-bottom: 20px;
     }
+  }
+  .empty {
+    margin: 40px 0;
   }
 }
 </style>

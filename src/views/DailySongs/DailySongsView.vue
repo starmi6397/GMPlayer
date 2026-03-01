@@ -18,7 +18,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { getDailySongs } from "@/api/home";
 import { musicStore } from "@/store";
 import { CalendarTodayFilled } from "@vicons/material";
@@ -32,7 +32,7 @@ const music = musicStore();
 const getDailySongsData = () => {
   if (music.getDailySongs.length === 0) {
     getDailySongs().then((res) => {
-      console.log(res)
+      console.log(res);
       if (res.data?.dailySongs) {
         music.setDailySongs(res.data.dailySongs);
       } else {

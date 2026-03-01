@@ -13,28 +13,19 @@
       @click.stop
     >
       <template #prefix>
-        <n-icon
-          size="16"
-          :class="site.searchInputActive ? 'active' : ''"
-          :component="Search"
-        />
+        <n-icon size="16" :class="site.searchInputActive ? 'active' : ''" :component="Search" />
       </template>
     </n-input>
     <CollapseTransition easing="ease-in-out">
       <n-card
         class="list"
         v-show="
-          site.searchInputActive &&
-          !inputValue &&
-          (music.getSearchHistory[0] || searchData.hot[0])
+          site.searchInputActive && !inputValue && (music.getSearchHistory[0] || searchData.hot[0])
         "
         content-style="padding: 0"
       >
         <n-scrollbar>
-          <div
-            class="history-list"
-            v-if="music.getSearchHistory[0] && setting.searchHistory"
-          >
+          <div class="history-list" v-if="music.getSearchHistory[0] && setting.searchHistory">
             <div class="list-title">
               <n-icon size="16" :component="History" />
               <n-text>{{ $t("nav.search.history") }}</n-text>
@@ -74,13 +65,7 @@
                 <span class="name">
                   {{ item.searchWord }}
                   <!-- <img :src="item.iconUrl" alt="icon" /> -->
-                  <n-tag
-                    v-if="item.iconUrl"
-                    class="tag"
-                    round
-                    :bordered="false"
-                    size="small"
-                  >
+                  <n-tag v-if="item.iconUrl" class="tag" round :bordered="false" size="small">
                     {{ item.iconType == 1 ? "HOT" : "UP" }}
                   </n-tag>
                 </span>
@@ -98,10 +83,7 @@
         content-style="padding: 0"
       >
         <n-scrollbar>
-          <div
-            class="suggest-tip"
-            v-if="Object.keys(searchData.suggest).length === 0"
-          >
+          <div class="suggest-tip" v-if="Object.keys(searchData.suggest).length === 0">
             <n-icon size="16" :component="Find" />
             <span>{{ $t("nav.search.noSuggestions") }}</span>
           </div>
@@ -239,6 +221,10 @@ const getSearchSuggestData = (keywords) => {
 
 // 点击搜索结果
 const toSearch = (val, type) => {
+  // 非直接搜索时关闭搜索面板
+  if (type !== 0) {
+    site.searchInputActive = false;
+  }
   switch (type) {
     case 0:
       // 直接搜索
@@ -267,7 +253,10 @@ const toSearch = (val, type) => {
       break;
     case 1000:
       // 歌单页
-      router.push(`/playlist?id=${val}`);
+      router.push({
+        path: "/playlist",
+        query: { id: val, page: 1 },
+      });
       break;
     default:
       break;
@@ -333,7 +322,7 @@ watch(
         getSearchSuggestData(value.trim());
       }, 500);
     }
-  }
+  },
 );
 
 // 监听播放列表显隐
@@ -344,7 +333,7 @@ watch(
       searchInpRef.value?.blur();
       site.searchInputActive = false;
     }
-  }
+  },
 );
 </script>
 
@@ -354,7 +343,11 @@ watch(
   width: 100%;
   display: flex;
   justify-content: flex-end;
+  // 允许拖动穿透空白区域
+  pointer-events: none;
   .input {
+    // 输入框本身保持可交互
+    pointer-events: auto;
     width: 200px;
     transition: all 0.3s;
     @media (max-width: 450px) {
@@ -391,6 +384,7 @@ watch(
     border-radius: 8px;
     width: 280px;
     z-index: 3;
+    pointer-events: auto; // 恢复点击事件，防止被父元素的 pointer-events: none 影响
 
     @media (max-width: 450px) {
       position: fixed;

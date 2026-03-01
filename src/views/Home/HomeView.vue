@@ -1,9 +1,11 @@
 <template>
   <div class="home">
-    <Banner v-if="setting.bannerShow" />
+    <div v-if="setting.bannerShow" class="home-section">
+      <Banner />
+    </div>
     <!-- 个性化推荐 -->
-    <n-h3 class="title" prefix="bar">{{ $t("home.title.exclusive") }}</n-h3>
-    <n-grid class="recommend" :x-gap="20" :cols="2">
+    <n-h3 class="title home-section" prefix="bar">{{ $t("home.title.exclusive") }}</n-h3>
+    <n-grid class="recommend home-section" :x-gap="20" :cols="2">
       <n-gi class="rec-left">
         <!-- 每日推荐 -->
         <PaDailySongs />
@@ -22,13 +24,19 @@
       </n-gi>
     </n-grid>
     <!-- 公共推荐 -->
-    <PaPlayLists />
-    <PaArtists />
-    <PaAlbum />
+    <div class="home-section">
+      <PaPlayLists />
+    </div>
+    <div class="home-section">
+      <PaArtists />
+    </div>
+    <div class="home-section">
+      <PaAlbum />
+    </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { settingStore } from "@/store";
 import Banner from "@/components/Banner/index.vue";
 import PaPlayLists from "@/components/Personalized/PaPlayLists.vue";
@@ -38,15 +46,24 @@ import PaDailySongs from "@/components/Personalized/PaDailySongs.vue";
 import PaPersonalFm from "@/components/Personalized/PaPersonalFm.vue";
 import PaRadar from "@/components/Personalized/PaRadar.vue";
 import PaLikeSongs from "@/components/Personalized/PaLikeSongs.vue";
-import BackgroundRender from "../../libs/apple-music-like/BackgroundRender.vue";
+import gsap from "gsap";
+import { onMounted } from "vue";
 
 const setting = settingStore();
 
 onMounted(() => {
-  if (typeof $setSiteTitle !== "undefined")
-    $setSiteTitle(import.meta.env.VITE_SITE_TITLE);
+  if (typeof $setSiteTitle !== "undefined") $setSiteTitle(import.meta.env.VITE_SITE_TITLE);
   // 回顶
   if (typeof $scrollToTop !== "undefined") $scrollToTop();
+
+  // GSAP 入场动画
+  gsap.from(".home-section", {
+    opacity: 0,
+    y: 30,
+    duration: 0.5,
+    stagger: 0.15,
+    ease: "power2.out",
+  });
 });
 </script>
 
@@ -80,4 +97,7 @@ onMounted(() => {
     }
   }
 }
+// .home-section {
+//   opacity: 0;
+// }
 </style>

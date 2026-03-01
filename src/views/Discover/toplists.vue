@@ -4,13 +4,7 @@
       {{ $t("nav.officialList") }}
     </n-divider>
     <Transition mode="out-in">
-      <n-grid
-        class="official"
-        x-gap="20"
-        y-gap="20"
-        :cols="2"
-        v-if="toplistData.officialList[0]"
-      >
+      <n-grid class="official" x-gap="20" y-gap="20" :cols="2" v-if="toplistData.officialList[0]">
         <n-gi v-for="item in toplistData.officialList" :key="item">
           <n-card
             class="item"
@@ -26,10 +20,7 @@
             <div class="cover">
               <n-avatar
                 class="coverImg"
-                :src="
-                  item.coverImgUrl.replace(/^http:/, 'https:') +
-                  '?param=300y300'
-                "
+                :src="item.coverImgUrl.replace(/^http:/, 'https:') + '?param=300y300'"
                 fallback-src="/images/pic/default.png"
               />
               <n-text class="update" v-html="item.updateFrequency" />
@@ -37,12 +28,8 @@
             <div class="data">
               <n-text class="title" v-html="item.name" />
               <div class="desc">
-                <div
-                  class="song text-hidden"
-                  v-for="(song, index) in item.tracks"
-                  :key="song"
-                >
-                  <n-text>{{ index + 1 }}. {{ song.first }} - </n-text>
+                <div class="song text-hidden" v-for="(song, index) in item.tracks" :key="song">
+                  <n-text>{{ Number(index) + 1 }}. {{ song.first }} - </n-text>
                   <n-text depth="3">{{ song.second }}</n-text>
                 </div>
               </div>
@@ -56,7 +43,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { getToplist } from "@/api/album";
 import { useRouter } from "vue-router";
 import { formatNumber } from "@/utils/timeTools";
@@ -77,14 +64,14 @@ const toplistData = reactive({
 // 获取排行榜数据
 const getToplistData = () => {
   getToplist().then((res) => {
-    toplistData.officialList = [];
-    toplistData.globalList = [];
     if (res.list[0]) {
-      res.list.forEach((v) => {
+      const official: any[] = [];
+      const global: any[] = [];
+      res.list.forEach((v: any) => {
         if (v.ToplistType) {
-          toplistData.officialList.push(v);
+          official.push(v);
         } else {
-          toplistData.globalList.push({
+          global.push({
             id: v.id,
             cover: v.coverImgUrl,
             name: v.name,
@@ -93,7 +80,8 @@ const getToplistData = () => {
           });
         }
       });
-      console.log(toplistData);
+      toplistData.officialList = official;
+      toplistData.globalList = global;
     } else {
       $message.error(t("general.message.acquisitionFailed"));
     }

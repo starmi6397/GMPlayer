@@ -1,10 +1,7 @@
 <template>
   <!-- 喜欢的音乐 -->
-  <div
-    class="like-song"
-    :style="`background-image: url(${cardImage})`"
-    @click="toLikeSongs"
-  >
+  <div class="like-song" @click="toLikeSongs">
+    <div class="like-song-bg" :style="`background-image: url(${cardImage})`" />
     <div class="gray" />
     <div class="left">
       <n-icon class="icon" :component="CollectionRecords" size="30" />
@@ -33,11 +30,9 @@ const cardImage = ref(null);
 // 生成卡片背景
 const getCardImage = (index) => {
   if (user.userLogin && user.getUserPlayLists.own[0]) {
-    const num =
-      index ?? Math.floor(Math.random() * user.getUserPlayLists.own.length);
+    const num = index ?? Math.floor(Math.random() * user.getUserPlayLists.own.length);
     cardImage.value =
-      user.getUserPlayLists.own[num]?.cover.replace(/^http:/, "https:") +
-      "?param=100y100";
+      user.getUserPlayLists.own[num]?.cover.replace(/^http:/, "https:") + "?param=100y100";
   } else {
     cardImage.value = "/images/pic/pic.jpg";
   }
@@ -60,11 +55,7 @@ const toLikeSongs = () => {
 
 onMounted(() => {
   getCardImage();
-  if (
-    user.userLogin &&
-    !user.getUserPlayLists.has &&
-    !user.getUserPlayLists.isLoading
-  ) {
+  if (user.userLogin && !user.getUserPlayLists.has && !user.getUserPlayLists.isLoading) {
     user.setUserPlayLists(() => {
       getCardImage();
     });
@@ -85,12 +76,11 @@ onMounted(() => {
   border-radius: 8px;
   padding: 0 18px;
   box-sizing: border-box;
-  background-repeat: no-repeat;
-  background-size: 120% 120%;
-  background-position: center;
   cursor: pointer;
   z-index: 0;
   overflow: hidden;
+  transform: translateZ(0);
+  perspective: 1px;
   &:hover {
     .left {
       .title {
@@ -111,13 +101,24 @@ onMounted(() => {
       }
     }
   }
+  .like-song-bg {
+    position: absolute;
+    top: -11%;
+    left: -11%;
+    width: 122%;
+    height: 122%;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    z-index: -2;
+  }
   .gray {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #00000040;
+    top: -11%;
+    left: -11%;
+    width: 122%;
+    height: 122%;
+    background-color: rgba(0, 0, 0, 0.4);
     -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
     z-index: -1;

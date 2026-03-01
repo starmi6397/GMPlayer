@@ -6,14 +6,12 @@
     :description="$t('state.errorDesc')"
   >
     <template #footer>
-      <n-button type="primary" @click="router.push('/')">{{
-        $t("general.name.reload")
-      }}</n-button>
+      <n-button type="primary" @click="router.push('/')">{{ $t("general.name.reload") }}</n-button>
     </template>
   </n-result>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useRouter } from "vue-router";
 const router = useRouter();
 

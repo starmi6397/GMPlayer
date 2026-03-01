@@ -1,9 +1,6 @@
 <template>
-  <div
-    class="padailysongs"
-    :style="`background-image: url(${cardImage})`"
-    @click="router.push('/dailySongs')"
-  >
+  <div class="padailysongs" @click="router.push('/dailySongs')">
+    <div class="padailysongs-bg" :style="`background-image: url(${cardImage})`" />
     <div class="gray" />
     <div class="text">
       <div class="date">
@@ -16,17 +13,8 @@
       </div>
     </div>
     <div class="control">
-      <n-avatar
-        class="cover"
-        :src="cardImage"
-        fallback-src="/images/pic/default.png"
-      />
-      <n-icon
-        class="play"
-        :component="PlayCircleFilled"
-        size="50"
-        @click.stop="playThisSong"
-      />
+      <n-avatar class="cover" :src="cardImage" fallback-src="/images/pic/default.png" />
+      <n-icon class="play" :component="PlayCircleFilled" size="50" @click.stop="playThisSong" />
     </div>
   </div>
 </template>
@@ -51,10 +39,8 @@ const randomNumber = Math.floor(Math.random() * music.getDailySongs.length);
 const getCardImage = () => {
   if (user.userLogin && music.getDailySongs[0]) {
     cardImage.value =
-      music.getDailySongs[randomNumber]?.album.picUrl.replace(
-        /^http:/,
-        "https:"
-      ) + "?param=100y100";
+      music.getDailySongs[randomNumber]?.album.picUrl.replace(/^http:/, "https:") +
+      "?param=100y100";
   } else {
     cardImage.value = "/images/pic/pic.jpg";
   }
@@ -118,10 +104,9 @@ onMounted(() => {
   z-index: 0;
   margin-bottom: 20px;
   transition: all 0.3s;
-  background-repeat: no-repeat;
-  background-size: 120% 120%;
-  background-position: center;
   cursor: pointer;
+  transform: translateZ(0);
+  perspective: 1px;
   &:hover {
     .control {
       .cover {
@@ -134,13 +119,24 @@ onMounted(() => {
       }
     }
   }
+  .padailysongs-bg {
+    position: absolute;
+    top: -11%;
+    left: -11%;
+    width: 122%;
+    height: 122%;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    z-index: -2;
+  }
   .gray {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #00000040;
+    top: -11%;
+    left: -11%;
+    width: 122%;
+    height: 122%;
+    background-color: rgba(0, 0, 0, 0.4);
     -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
     z-index: -1;

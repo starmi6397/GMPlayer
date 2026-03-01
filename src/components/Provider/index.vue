@@ -21,7 +21,7 @@
     <n-loading-bar-provider>
       <n-dialog-provider>
         <n-notification-provider>
-          <n-message-provider :max="1">
+          <n-message-provider :max="3" :duration="2000">
             <slot></slot>
             <NaiveProviderContent />
           </n-message-provider>
@@ -56,9 +56,13 @@ const changeTheme = () => {
   if (setting.getSiteTheme == "light") {
     theme.value = null;
     themeColorMeta.setAttribute("content", "#ffffff");
+    setCssVariable("--message-bg", "rgba(255, 255, 255, 0.72)");
+    setCssVariable("--message-border", "rgba(0, 0, 0, 0.06)");
   } else if (setting.getSiteTheme == "dark") {
     theme.value = darkTheme;
     themeColorMeta.setAttribute("content", "#18181c");
+    setCssVariable("--message-bg", "rgba(48, 48, 51, 0.72)");
+    setCssVariable("--message-border", "rgba(255, 255, 255, 0.08)");
   }
 };
 
@@ -118,7 +122,7 @@ watch(
   () => setting.getSiteTheme,
   () => {
     changeTheme();
-  }
+  },
 );
 
 // 监听系统明暗变化
@@ -126,17 +130,17 @@ watch(
   () => osThemeRef.value,
   (val) => {
     osThemeChange(val);
-  }
+  },
 );
 
 // 监听主题色变化
 watch(
   () => setting.themeType,
-  (val) => changeThemeColor(val)
+  (val) => changeThemeColor(val),
 );
 watch(
   () => setting.themeData,
-  (val) => changeThemeColor(val.label)
+  (val) => changeThemeColor(val.label),
 );
 
 onMounted(() => {

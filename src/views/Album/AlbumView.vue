@@ -15,10 +15,7 @@
       <div class="meta">
         <div class="title">
           <n-text class="name">{{ albumDetail.name }}</n-text>
-          <n-text
-            class="creator"
-            @click="router.push(`/artist/songs?id=${albumDetail.artist.id}`)"
-          >
+          <n-text class="creator" @click="router.push(`/artist/songs?id=${albumDetail.artist.id}`)">
             {{ albumDetail.artist.name }}
           </n-text>
         </div>
@@ -27,11 +24,7 @@
             $t("general.name.desc", { name: $t("general.name.album") })
           }}</span>
           <span class="desc text-hidden">
-            {{
-              albumDetail.description
-                ? albumDetail.description
-                : $t("other.noDesc")
-            }}
+            {{ albumDetail.description ? albumDetail.description : $t("other.noDesc") }}
           </span>
           <n-button
             class="all-desc"
@@ -45,13 +38,7 @@
           </n-button>
         </div>
         <n-space class="tag" v-if="albumDetail.tags">
-          <n-tag
-            class="tags"
-            round
-            :bordered="false"
-            v-for="item in albumDetail.tags"
-            :key="item"
-          >
+          <n-tag class="tags" round :bordered="false" v-for="item in albumDetail.tags" :key="item">
             {{ item }}
           </n-tag>
         </n-space>
@@ -80,10 +67,7 @@
     <div class="right">
       <div class="meta">
         <n-text class="name">{{ albumDetail.name }}</n-text>
-        <n-text
-          class="creator"
-          @click="router.push(`/artist/songs?id=${albumDetail.artist.id}`)"
-        >
+        <n-text class="creator" @click="router.push(`/artist/songs?id=${albumDetail.artist.id}`)">
           <n-icon :depth="3" :component="People" />
           {{ albumDetail.artist.name }}
         </n-text>
@@ -133,50 +117,33 @@
   </div>
 </template>
 
-<script setup>
-import { NIcon, NAvatar, NText } from "naive-ui";
+<script setup lang="ts">
+import { NIcon, NText } from "naive-ui";
 import { getAlbum, likeAlbum } from "@/api/album";
 import { useRouter } from "vue-router";
-import { getSongTime, getLongTime } from "@/utils/timeTools";
-import {
-  MusicList,
-  LinkTwo,
-  More,
-  Like,
-  Unlike,
-  People,
-  Time,
-  City,
-} from "@icon-park/vue-next";
+import { getLongTime } from "@/utils/timeTools";
+import { transformSongData } from "@/utils/ncm/transformSongData";
+import { renderIcon } from "@/utils/ui/renderIcon";
+import { buildLikeMessage } from "@/utils/ui/buildLikeMessage";
+import { usePlayAllSong } from "@/composables/usePlayAllSong";
+import { MusicList, LinkTwo, More, Like, Unlike, People, Time, City } from "@icon-park/vue-next";
 import { userStore, musicStore, settingStore } from "@/store";
 import { useI18n } from "vue-i18n";
 import DataLists from "@/components/DataList/DataLists.vue";
-import getCoverUrl from "@/utils/getCoverUrl";
+import getCoverUrl from "@/utils/ncm/getCoverUrl";
 
 const { t } = useI18n();
 const router = useRouter();
 const user = userStore();
 const music = musicStore();
 const setting = settingStore();
+const { playAllSong: playAll } = usePlayAllSong();
 
 // 专辑数据
 const albumId = ref(router.currentRoute.value.query.id);
 const albumDetail = ref(null);
 const albumData = ref([]);
 const albumDescShow = ref(false);
-
-// 图标渲染
-const renderIcon = (icon) => {
-  return () => {
-    return h(
-      NIcon,
-      { style: { transform: "translateX(2px)" } },
-      {
-        default: () => icon,
-      }
-    );
-  };
-};
 
 // 判断收藏还是取消
 const isLikeOrDislike = (id) => {
@@ -203,9 +170,7 @@ const setDropdownOptions = () => {
         onClick: () => {
           if (navigator.clipboard) {
             try {
-              navigator.clipboard.writeText(
-                `https://music.163.com/#/playlist?id=${albumId.value}`
-              );
+              navigator.clipboard.writeText(`https://music.163.com/#/album?id=${albumId.value}`);
               $message.success(t("general.message.copySuccess"));
             } catch (err) {
               console.error(t("general.message.copyFailure"), err);
@@ -237,126 +202,54 @@ const setDropdownOptions = () => {
 // 获取歌单信息
 const getAlbumData = (id) => {
   getAlbum(id).then((res) => {
-    console.log(res);
     // 专辑信息
     albumDetail.value = res.album;
     const albumCover = res.album.picUrl;
-    $setSiteTitle(res.album.name + " - " + t("general.name.album"));
+    window.$setSiteTitle(res.album.name + " - " + t("general.name.album"));
     // 专辑歌曲
     if (res.songs) {
-      albumData.value = [];
-      res.songs.forEach((v, i) => {
-        v.al.picUrl = albumCover
-        albumData.value.push({
-          id: v.id,
-          num: i + 1,
-          name: v.name,
-          artist: v.ar,
-          album: v.al,
-          alia: v.alia,
-          time: getSongTime(v.dt),
-          fee: v.fee,
-          sourceId: id,
-          pc: v.pc ? v.pc : null,
-          mv: v.mv ? v.mv : null,
-        });
+      albumData.value = transformSongData(res.songs, {
+        sourceId: id,
+        albumTransform: (v) => {
+          v.al.picUrl = albumCover;
+          return v.al;
+        },
       });
     } else {
-      $message.error(t("general.message.acquisitionFailed"));
+      window.$message.error(t("general.message.acquisitionFailed"));
     }
   });
 };
 
 // 播放专辑所有歌曲
 const playAllSong = () => {
-  try {
-    // 获取元素
-    const songDom = document.getElementById("datalists").firstElementChild;
-    const allSongDom = document.querySelectorAll("#datalists > *");
-    // 是否有元素存在 play
-    let isHasPlay = false;
-    // 遍历
-    allSongDom.forEach((child) => {
-      if (child.classList.contains("play")) {
-        isHasPlay = true;
-      }
-    });
-    if (!isHasPlay) {
-      // 双击操作
-      const event = new MouseEvent("dblclick", {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-      });
-      // 双击或单击
-      if (setting.listClickMode === "dblclick") {
-        songDom.dispatchEvent(event);
-      } else if (setting.listClickMode === "click") {
-        songDom.click();
-      }
-    } else {
-      music.setPlayState(true);
-    }
-  } catch (err) {
-    console.error($message.error(t("general.message.operationFailed")), err);
-    $message.error($message.error(t("general.message.operationFailed")));
-  }
+  playAll(albumData.value);
 };
 
 // 收藏/取消收藏
 const toChangeLike = async (id) => {
   const type = isLikeOrDislike(id) ? 1 : 2;
   const likeMsg = t("general.name.album");
-  const isThereASpace = setting.language === "zh-CN" ? "" : " ";
   try {
     const res = await likeAlbum(type, id);
     if (res.code === 200) {
-      $message.success(
-        `${likeMsg + isThereASpace}${
-          type == 1
-            ? t("menu.collection", { name: t("general.dialog.success") })
-            : t("menu.cancelCollection", { name: t("general.dialog.success") })
-        }`
-      );
+      $message.success(buildLikeMessage(t, likeMsg, type, "success", setting.language));
       user.setUserAlbumLists(() => {
         setDropdownOptions();
       });
     } else {
-      $message.error(
-        `${likeMsg + isThereASpace}${
-          type == 1
-            ? t("menu.collection", { name: t("general.dialog.failed") })
-            : t("menu.cancelCollection", { name: t("general.dialog.failed") })
-        }`
-      );
+      $message.error(buildLikeMessage(t, likeMsg, type, "failed", setting.language));
     }
   } catch (err) {
-    $message.error(
-      `${likeMsg + isThereASpace}${
-        type == 1
-          ? t("menu.collection", { name: t("general.dialog.failed") })
-          : t("menu.cancelCollection", { name: t("general.dialog.failed") })
-      }`
-    );
-    console.error(
-      `${likeMsg + isThereASpace}${
-        type == 1
-          ? t("menu.collection", { name: t("general.dialog.failed") })
-          : t("menu.cancelCollection", { name: t("general.dialog.failed") })
-      }`,
-      err
-    );
+    console.error(buildLikeMessage(t, likeMsg, type, "failed", setting.language), err);
+    $message.error(buildLikeMessage(t, likeMsg, type, "failed", setting.language));
   }
 };
 
 onMounted(() => {
   if (albumId.value) {
     getAlbumData(albumId.value);
-    if (
-      user.userLogin &&
-      !user.getUserAlbumLists.has &&
-      !user.getUserAlbumLists.isLoading
-    ) {
+    if (user.userLogin && !user.getUserAlbumLists.has && !user.getUserAlbumLists.isLoading) {
       user.setUserAlbumLists(() => {
         setDropdownOptions();
       });
@@ -374,7 +267,7 @@ watch(
     if (val.name == "album") {
       getAlbumData(albumId.value);
     }
-  }
+  },
 );
 </script>
 

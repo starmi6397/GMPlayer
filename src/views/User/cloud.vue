@@ -1,14 +1,7 @@
 <template>
   <div class="cloud">
     <div class="data">
-      <n-button
-        class="up"
-        type="primary"
-        strong
-        secondary
-        round
-        @click="upSongRef.click()"
-      >
+      <n-button class="up" type="primary" strong secondary round @click="upSongRef.click()">
         <template #icon>
           <n-icon :component="BackupRound" />
         </template>
@@ -85,7 +78,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { getCloud, upCloudSong } from "@/api/user";
 import { useRouter } from "vue-router";
 import { settingStore } from "@/store";
@@ -94,6 +87,7 @@ import { BackupRound } from "@vicons/material";
 import { useI18n } from "vue-i18n";
 import DataLists from "@/components/DataList/DataLists.vue";
 import Pagination from "@/components/Pagination/index.vue";
+import type { ProgressStatus } from "naive-ui";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -104,15 +98,13 @@ const cloudSpace = ref([]);
 const cloudData = ref([]);
 const pagelimit = ref(30);
 const pageNumber = ref(
-  router.currentRoute.value.query.page
-    ? Number(router.currentRoute.value.query.page)
-    : 1
+  router.currentRoute.value.query.page ? Number(router.currentRoute.value.query.page) : 1,
 );
 const totalCount = ref(0);
 
 // 上传歌曲数据
 const upSongRef = ref(null);
-const upSongType = ref("success");
+const upSongType = ref<ProgressStatus>("success");
 const upSongModal = ref(false);
 const upSongCompleted = ref(0);
 
@@ -174,7 +166,7 @@ const upCloudSongData = (e) => {
         $message.success(
           t("general.message.upCloudSuccess", {
             name: res.privateCloud.simpleSong?.name,
-          })
+          }),
         );
         getCloudData(pagelimit.value, (pageNumber.value - 1) * pagelimit.value);
       } else {
@@ -223,11 +215,7 @@ const pageNumberChange = (val) => {
 
 // 当前页数据重载
 const cloudDataLoad = (scroll = false) => {
-  getCloudData(
-    pagelimit.value,
-    (pageNumber.value - 1) * pagelimit.value,
-    scroll
-  );
+  getCloudData(pagelimit.value, (pageNumber.value - 1) * pagelimit.value, scroll);
 };
 provide("cloudDataLoad", cloudDataLoad);
 
@@ -235,11 +223,11 @@ provide("cloudDataLoad", cloudDataLoad);
 watch(
   () => router.currentRoute.value,
   (val) => {
-    pageNumber.value = Number(val.query.page ? val.query.page : 1);
     if (val.name == "user-cloud") {
+      pageNumber.value = Number(val.query.page ? val.query.page : 1);
       getCloudData(pagelimit.value, (pageNumber.value - 1) * pagelimit.value);
     }
-  }
+  },
 );
 
 onMounted(() => {

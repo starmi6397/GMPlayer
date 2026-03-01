@@ -10,7 +10,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { getArtistVideos } from "@/api/artist";
 import { useRouter } from "vue-router";
 import { formatNumber, getSongTime } from "@/utils/timeTools";
@@ -31,31 +31,38 @@ const artistId = ref(router.currentRoute.value.query.id);
 const artistData = ref([]);
 const pagelimit = ref(30);
 const pageNumber = ref(
-  router.currentRoute.value.query.page
-    ? Number(router.currentRoute.value.query.page)
-    : 1
+  router.currentRoute.value.query.page ? Number(router.currentRoute.value.query.page) : 1,
 );
 const totalCount = ref(0);
 
 // 获取歌手视频
-const getArtistVideosData = (id, limit = 30, offset = 0) => {
-  getArtistVideos(id, limit, offset).then((res) => {
+const getArtistVideosData = (id: string | number | string[], limit = 30, offset = 0) => {
+  getArtistVideos(Number(id), limit, offset).then((res) => {
     console.log(res);
     // 数据总数
     totalCount.value = props.mvSize;
     // 列表数据
     artistData.value = [];
     if (res.mvs) {
-      res.mvs.forEach((v) => {
-        artistData.value.push({
-          id: v.id,
-          cover: v.imgurl16v9,
-          name: v.name,
-          artist: [v.artist],
-          playCount: formatNumber(v.playCount),
-          duration: getSongTime(v.duration),
-        });
-      });
+      res.mvs.forEach(
+        (v: {
+          id: number;
+          imgurl16v9: string;
+          name: string;
+          artist: any;
+          playCount: string | number;
+          duration: number;
+        }) => {
+          artistData.value.push({
+            id: v.id,
+            cover: v.imgurl16v9,
+            name: v.name,
+            artist: [v.artist],
+            playCount: formatNumber(v.playCount),
+            duration: getSongTime(v.duration),
+          });
+        },
+      );
     } else {
       $message.error("搜索内容为空");
     }
@@ -65,7 +72,7 @@ const getArtistVideosData = (id, limit = 30, offset = 0) => {
 };
 
 // 当前页数数据变化
-const pageNumberChange = (val) => {
+const pageNumberChange = (val: number) => {
   router.push({
     path: "/artist/videos",
     query: {
@@ -76,37 +83,29 @@ const pageNumberChange = (val) => {
 };
 
 // 每页个数数据变化
-const pageSizeChange = (val) => {
+const pageSizeChange = (val: number) => {
   console.log(val);
   pagelimit.value = val;
-  getArtistVideosData(
-    artistId.value,
-    val,
-    (pageNumber.value - 1) * pagelimit.value
-  );
+  getArtistVideosData(artistId.value, val, (pageNumber.value - 1) * pagelimit.value);
 };
 
 onMounted(() => {
-  getArtistVideosData(
-    artistId.value,
-    pagelimit.value,
-    (pageNumber.value - 1) * pagelimit.value
-  );
+  getArtistVideosData(artistId.value, pagelimit.value, (pageNumber.value - 1) * pagelimit.value);
 });
 
 // 监听路由参数变化
 watch(
   () => router.currentRoute.value,
   (val) => {
-    artistId.value = val.query.id;
-    pageNumber.value = Number(val.query.page ? val.query.page : 1);
     if (val.name == "ar-videos") {
+      artistId.value = val.query.id;
+      pageNumber.value = Number(val.query.page ? val.query.page : 1);
       getArtistVideosData(
         artistId.value,
         pagelimit.value,
-        (pageNumber.value - 1) * pagelimit.value
+        (pageNumber.value - 1) * pagelimit.value,
       );
     }
-  }
+  },
 );
 </script>

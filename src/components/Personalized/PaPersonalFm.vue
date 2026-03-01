@@ -1,20 +1,17 @@
 <template>
   <Transition mode="out-in">
-    <div
-      v-if="music.getPersonalFmData?.id"
-      class="papersonalfm"
-      :style="`background-image: url(${music.getPersonalFmData.album.picUrl.replace(
-        /^http:/,
-        'https:'
-      )}?param=300y300)`"
-    >
+    <div v-if="music.getPersonalFmData?.id" class="papersonalfm">
+      <div
+        class="papersonalfm-bg"
+        :style="`background-image: url(${music.getPersonalFmData.album.picUrl.replace(
+          /^http:/,
+          'https:',
+        )}?param=300y300)`"
+      />
       <div class="gray" />
       <img
         class="pic"
-        :src="
-          music.getPersonalFmData.album.picUrl.replace(/^http:/, 'https:') +
-          '?param=300y300'
-        "
+        :src="music.getPersonalFmData.album.picUrl.replace(/^http:/, 'https:') + '?param=300y300'"
         alt="pic"
       />
       <div class="data">
@@ -25,10 +22,7 @@
           >
             {{ music.getPersonalFmData.name }}
           </span>
-          <AllArtists
-            class="text-hidden"
-            :artistsData="music.getPersonalFmData.artist"
-          />
+          <AllArtists class="text-hidden" :artistsData="music.getPersonalFmData.artist" />
         </div>
         <div class="controls">
           <n-icon
@@ -43,12 +37,7 @@
             "
             @click="fmPlayOrPause"
           />
-          <n-icon
-            class="next"
-            size="30"
-            :component="SkipNextRound"
-            @click="fmNext"
-          />
+          <n-icon class="next" size="30" :component="SkipNextRound" @click="fmNext" />
           <n-icon
             class="dislike"
             size="20"
@@ -119,18 +108,27 @@ onMounted(() => {
   box-sizing: border-box;
   overflow: hidden;
   color: #ffffff;
-  background-repeat: no-repeat;
-  background-size: 150% 150%;
-  background-position: center;
   z-index: 0;
   transition: all 0.3s;
+  transform: translateZ(0);
+  perspective: 1px;
+  .papersonalfm-bg {
+    position: absolute;
+    top: -26%;
+    left: -26%;
+    width: 152%;
+    height: 152%;
+    background-repeat: no-repeat;
+    background-size: cover;
+    z-index: -2;
+  }
   .gray {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #00000040;
+    top: -26%;
+    left: -26%;
+    width: 152%;
+    height: 152%;
+    background-color: rgba(0, 0, 0, 0.4);
     -webkit-backdrop-filter: blur(40px);
     backdrop-filter: blur(40px);
     z-index: -1;

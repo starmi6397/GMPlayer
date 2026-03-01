@@ -14,10 +14,7 @@
       :model="playlistUpdateValue"
     >
       <n-form-item :label="$t('other.plName')" path="name">
-        <n-input
-          v-model:value="playlistUpdateValue.name"
-          :placeholder="$t('other.plNameTip')"
-        />
+        <n-input v-model:value="playlistUpdateValue.name" :placeholder="$t('other.plNameTip')" />
       </n-form-item>
       <n-form-item :label="$t('other.plDes')" path="desc">
         <n-input
@@ -55,7 +52,7 @@
 
 <script setup>
 import { playlistUpdate } from "@/api/playlist";
-import { formRules } from "@/utils/formRules";
+import { formRules } from "@/utils/ui/formRules";
 import { musicStore, userStore } from "@/store";
 import { useI18n } from "vue-i18n";
 
@@ -87,7 +84,7 @@ const toUpdatePlayList = (e) => {
         playlistUpdateId.value,
         playlistUpdateValue._value.name,
         playlistUpdateValue._value.desc,
-        playlistUpdateValue._value.tags.join(";")
+        playlistUpdateValue._value.tags.join(";"),
       ).then((res) => {
         console.log(res);
         if (res.code === 200) {

@@ -43,10 +43,7 @@
         <n-scrollbar>
           <div class="all-cat" v-if="music.catList?.sub[0]">
             <n-list>
-              <n-list-item
-                v-for="(cat, key) in music.catList.categories"
-                :key="cat"
-              >
+              <n-list-item v-for="(cat, key) in music.catList.categories" :key="cat">
                 <template #prefix>
                   <n-text class="type"> {{ cat }} </n-text>
                 </template>
@@ -56,7 +53,7 @@
                     class="tag"
                     size="large"
                     v-for="item in music.catList.sub.filter(
-                      (v) => v.category == key
+                      (v: { category: string | number }) => v.category == key,
                     )"
                     :key="item"
                     :bordered="false"
@@ -65,11 +62,7 @@
                   >
                     {{ item.name }}
                     <template #icon>
-                      <n-icon
-                        class="icon"
-                        v-if="item.hot"
-                        :component="LocalFireDepartmentRound"
-                      />
+                      <n-icon class="icon" v-if="item.hot" :component="LocalFireDepartmentRound" />
                     </template>
                   </n-tag>
                 </n-space>
@@ -83,15 +76,11 @@
       </n-modal>
       <!-- 精品歌单开关 -->
       <n-space
-        v-if="getHaveHqPlaylists(music.highqualityCatList, catName)"
+        v-if="getHaveHqPlaylists(music.highqualityCatList, catName.toString())"
         align="center"
       >
         <n-text>{{ $t("general.name.bestPlaylist") }}</n-text>
-        <n-switch
-          v-model:value="hqPLayListOpen"
-          @update:value="hqPLayListChange"
-          :round="false"
-        />
+        <n-switch v-model:value="hqPLayListOpen" @update:value="hqPLayListChange" :round="false" />
       </n-space>
     </div>
     <CoverLists :listData="playlistsData" />
@@ -114,7 +103,7 @@
         @click="
           () => {
             loading = true;
-            getHqPlaylistData(catName);
+            getHqPlaylistData(catName.toString());
           }
         "
       >
@@ -124,7 +113,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ChevronRightRound, LocalFireDepartmentRound } from "@vicons/material";
 import { useRouter } from "vue-router";
 import { musicStore } from "@/store";
@@ -141,9 +130,7 @@ const music = musicStore();
 // 分类数据
 const catModalShow = ref(false);
 const catName = ref(
-  router.currentRoute.value.query.cat
-    ? router.currentRoute.value.query.cat
-    : "全部歌单"
+  router.currentRoute.value.query.cat ? router.currentRoute.value.query.cat : "全部歌单",
 );
 
 // 歌单数据
@@ -151,9 +138,7 @@ const playlistsData = ref([]);
 const totalCount = ref(0);
 const pagelimit = ref(30);
 const pageNumber = ref(
-  router.currentRoute.value.query.page
-    ? Number(router.currentRoute.value.query.page)
-    : 1
+  router.currentRoute.value.query.page ? Number(router.currentRoute.value.query.page) : 1,
 );
 
 // 精品歌单数据
@@ -162,30 +147,30 @@ const hqPLayListOpen = ref(
     ? router.currentRoute.value.query.hq == "true"
       ? true
       : false
-    : false
+    : false,
 );
 const hasMore = ref(true);
 const loading = ref(false);
 
 // 获取是否有精品歌单
-const getHaveHqPlaylists = (array, name) => {
+const getHaveHqPlaylists = (array: any[], name: string) => {
   if (name == "全部歌单") {
     return true;
   } else {
-    return array.some((item) => {
+    return array.some((item: { name: any }) => {
       return item.name == name;
     });
   }
 };
 
 // 精品歌单状态变化
-const hqPLayListChange = (val) => {
+const hqPLayListChange = (val: any) => {
   playlistsData.value = [];
   router.push({
     path: "/discover/playlists",
     query: {
       cat: catName.value,
-      hq: val ? true : false,
+      hq: val ? "true" : "false",
       page: 1,
     },
   });
@@ -194,21 +179,17 @@ const hqPLayListChange = (val) => {
 // 获取歌单数据
 const getPlaylistData = (cat = "全部歌单", limit = 30, offset = 0) => {
   getTopPlaylist(cat, limit, offset).then((res) => {
-    console.log(res);
     // 数据总数
     totalCount.value = res.total;
     // 列表数据
-    playlistsData.value = [];
     if (res.playlists[0]) {
-      res.playlists.forEach((v) => {
-        playlistsData.value.push({
-          id: v.id,
-          cover: v.coverImgUrl,
-          name: v.name,
-          artist: v.creator,
-          playCount: formatNumber(v.playCount),
-        });
-      });
+      playlistsData.value = res.playlists.map((v: any) => ({
+        id: v.id,
+        cover: v.coverImgUrl,
+        name: v.name,
+        artist: v.creator,
+        playCount: formatNumber(v.playCount),
+      }));
     } else {
       $message.error(t("general.message.acquisitionFailed"));
     }
@@ -225,23 +206,21 @@ const getHqPlaylistData = (cat = "全部歌单", limit = 30) => {
     : null;
   // 获取数据
   getHighqualityPlaylist(cat, limit, before).then((res) => {
-    console.log(res);
     // 列表数据
     if (res.playlists[0]) {
       // 是否还有更多
-      res.more ? (hasMore.value = true) : (hasMore.value = false);
+      hasMore.value = !!res.more;
       loading.value = false;
-      // 遍历数据
-      res.playlists.forEach((v) => {
-        playlistsData.value.push({
-          id: v.id,
-          cover: v.coverImgUrl,
-          name: v.name,
-          artist: v.creator,
-          playCount: formatNumber(v.playCount),
-          updateTime: v.updateTime,
-        });
-      });
+      // 追加数据
+      const newItems = res.playlists.map((v: any) => ({
+        id: v.id,
+        cover: v.coverImgUrl,
+        name: v.name,
+        artist: v.creator,
+        playCount: formatNumber(v.playCount),
+        updateTime: v.updateTime,
+      }));
+      playlistsData.value.push(...newItems);
     } else {
       hasMore.value = false;
       $message.error(t("general.message.acquisitionFailed"));
@@ -250,7 +229,7 @@ const getHqPlaylistData = (cat = "全部歌单", limit = 30) => {
 };
 
 // 更换标签名
-const changeTagName = (name) => {
+const changeTagName = (name: any) => {
   playlistsData.value = [];
   router.push({
     path: "/discover/playlists",
@@ -262,27 +241,14 @@ const changeTagName = (name) => {
   catModalShow.value = false;
 };
 
-// 排序方式变化
-const listOrderChange = (order) => {
-  console.log(order);
-  router.push({
-    path: "/discover/playlists",
-    query: {
-      cat: catName.value,
-      page: 1,
-    },
-  });
-};
-
 // 每页个数数据变化
-const pageSizeChange = (val) => {
-  console.log(val);
+const pageSizeChange = (val: number) => {
   pagelimit.value = val;
-  getPlaylistData(catName.value, val, (pageNumber.value - 1) * pagelimit.value);
+  getPlaylistData(catName.value.toString(), val, (pageNumber.value - 1) * pagelimit.value);
 };
 
 // 当前页数数据变化
-const pageNumberChange = (val) => {
+const pageNumberChange = (val: number) => {
   router.push({
     path: "/discover/playlists",
     query: {
@@ -296,41 +262,36 @@ const pageNumberChange = (val) => {
 watch(
   () => router.currentRoute.value,
   (val) => {
-    catName.value = val.query.cat ? val.query.cat : "全部歌单";
-    hqPLayListOpen.value = val.query.hq
-      ? val.query.hq == "true"
-        ? true
-        : false
-      : false;
     if (val.name == "dsc-playlists") {
+      catName.value = val.query.cat ? val.query.cat : "全部歌单";
+      hqPLayListOpen.value = val.query.hq ? (val.query.hq == "true" ? true : false) : false;
       if (hqPLayListOpen.value) {
         playlistsData.value = [];
-        getHqPlaylistData(catName.value);
+        getHqPlaylistData(catName.value.toString());
       } else {
         pageNumber.value = val.query.page ? Number(val.query.page) : 1;
         getPlaylistData(
-          catName.value,
+          catName.value.toString(),
           pagelimit.value,
-          (pageNumber.value - 1) * pagelimit.value
+          (pageNumber.value - 1) * pagelimit.value,
         );
       }
     }
-  }
+  },
 );
 
 onMounted(() => {
   $setSiteTitle(t("nav.discover") + " - " + t("general.name.playlist"));
   // 获取歌单分类
-  if (!music.catList.sub || !music.highqualityCatList[0])
-    music.setCatList(true);
+  if (!music.catList.sub || !music.highqualityCatList[0]) music.setCatList(true);
   // 获取歌单数据
   if (hqPLayListOpen.value) {
-    getHqPlaylistData(catName.value);
+    getHqPlaylistData(catName.value.toString());
   } else {
     getPlaylistData(
-      catName.value,
+      catName.value.toString(),
       pagelimit.value,
-      (pageNumber.value - 1) * pagelimit.value
+      (pageNumber.value - 1) * pagelimit.value,
     );
   }
 });

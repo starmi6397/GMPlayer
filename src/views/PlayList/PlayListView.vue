@@ -19,18 +19,18 @@
       </div>
       <div class="meta">
         <div class="title">
-          <n-text class="name text-hidden">{{ playListDetail.name }}</n-text>
-          <n-text class="creator">{{ playListDetail.creator.nickname }}</n-text>
+          <n-text class="name text-hidden">{{ playListDetail!.name }}</n-text>
+          <n-text class="creator">{{ playListDetail!.creator.nickname }}</n-text>
         </div>
         <div class="intr">
           <span class="name">{{
-            $t("general.name.desc", { name: $t("general.name.playlist") })
+            t("general.name.desc", { name: t("general.name.playlist") })
           }}</span>
           <span class="desc text-hidden">
             {{
-              playListDetail.description
+              playListDetail && playListDetail.description
                 ? playListDetail.description
-                : $t("other.noDesc")
+                : t("other.noDesc")
             }}
           </span>
           <n-button
@@ -38,18 +38,20 @@
             block
             strong
             secondary
-            v-if="playListDetail?.description?.length > 70"
+            v-if="
+              playListDetail && playListDetail.description && playListDetail.description.length > 70
+            "
             @click="playListDescShow = true"
           >
-            {{ $t("general.name.allDesc") }}
+            {{ t("general.name.allDesc") }}
           </n-button>
         </div>
-        <n-space class="tag" v-if="playListDetail.tags">
+        <n-space class="tag" v-if="playListDetail && playListDetail.tags">
           <n-tag
             class="tags"
             round
             :bordered="false"
-            v-for="item in playListDetail.tags"
+            v-for="item in playListDetail!.tags"
             :key="item"
             @click="router.push(`/discover/playlists?cat=${item}&page=1`)"
           >
@@ -61,7 +63,7 @@
             <template #icon>
               <n-icon :component="MusicList" />
             </template>
-            {{ $t("general.name.play") }}
+            {{ t("general.name.play") }}
           </n-button>
           <n-dropdown
             placement="right-start"
@@ -80,19 +82,25 @@
     </div>
     <div class="right">
       <div class="meta">
-        <n-text class="name">{{ playListDetail.name }}</n-text>
+        <n-text class="name">{{ playListDetail!.name }}</n-text>
         <n-text class="creator">
           <n-icon :depth="3" :component="People" />
-          {{ playListDetail.creator.nickname }}
+          {{ playListDetail!.creator.nickname }}
         </n-text>
         <n-space class="time">
           <div class="num">
             <n-icon :depth="3" :component="Newlybuild" />
-            <n-text v-html="getLongTime(playListDetail.createTime)" />
+            <n-text
+              v-if="playListDetail && playListDetail.createTime"
+              v-html="getLongTime(playListDetail.createTime)"
+            />
           </div>
           <div class="num">
             <n-icon :depth="3" :component="Write" />
-            <n-text v-html="getLongTime(playListDetail.updateTime)" />
+            <n-text
+              v-if="playListDetail && playListDetail.updateTime"
+              v-html="getLongTime(playListDetail.updateTime)"
+            />
           </div>
         </n-space>
       </div>
@@ -110,24 +118,22 @@
         class="s-modal"
         v-model:show="playListDescShow"
         preset="card"
-        :title="$t('general.name.desc', { name: $t('general.name.playlist') })"
+        :title="t('general.name.desc', { name: t('general.name.playlist') })"
         :bordered="false"
       >
-        <n-scrollbar>
-          <n-text v-html="playListDetail.description.replace(/\n/g, '<br>')" />
+        <n-scrollbar v-if="hasPlaylistDescription">
+          <n-text v-html="playlistDescriptionHtml" />
         </n-scrollbar>
       </n-modal>
     </div>
   </div>
   <div class="title" v-else-if="!playListId || !loadingState">
     <span class="key">{{
-      loadingState
-        ? $t("general.name.noKeywords")
-        : $t("general.message.acquisitionFailed")
+      loadingState ? t("general.name.noKeywords") : t("general.message.acquisitionFailed")
     }}</span>
     <br />
     <n-button strong secondary @click="router.go(-1)" style="margin-top: 20px">
-      {{ $t("general.name.goBack") }}
+      {{ t("general.name.goBack") }}
     </n-button>
   </div>
   <div class="loading" v-else>
@@ -143,17 +149,17 @@
   </div>
 </template>
 
-<script setup>
-import { NIcon, NAvatar, NText } from "naive-ui";
-import {
-  getPlayListDetail,
-  getAllPlayList,
-  delPlayList,
-  likePlaylist,
-} from "@/api/playlist";
+<script setup lang="ts">
+import type { DropdownMixedOption } from "naive-ui/es/dropdown/src/interface";
+import { NIcon, NText } from "naive-ui";
+import { getPlayListDetail, getAllPlayList, delPlayList, likePlaylist } from "@/api/playlist";
 import { useRouter } from "vue-router";
 import { userStore, musicStore, settingStore } from "@/store";
-import { getSongTime, getLongTime } from "@/utils/timeTools";
+import { getLongTime } from "@/utils/timeTools";
+import { transformSongData } from "@/utils/ncm/transformSongData";
+import { renderIcon } from "@/utils/ui/renderIcon";
+import { buildLikeMessage } from "@/utils/ui/buildLikeMessage";
+import { usePlayAllSong } from "@/composables/usePlayAllSong";
 import {
   MusicList,
   LinkTwo,
@@ -168,44 +174,58 @@ import {
 import { useI18n } from "vue-i18n";
 import DataLists from "@/components/DataList/DataLists.vue";
 import Pagination from "@/components/Pagination/index.vue";
-import getCoverUrl from "@/utils/getCoverUrl";
-// import SpecialPlayLists from "./SpecialPlayLists.json";
+import getCoverUrl from "@/utils/ncm/getCoverUrl";
 
 const { t } = useI18n();
 const router = useRouter();
 const user = userStore();
 const music = musicStore();
 const setting = settingStore();
+const { playAllSong: playAll } = usePlayAllSong();
 
 // 歌单数据
-const playListId = ref(router.currentRoute.value.query.id);
-const playListDetail = ref(null);
-const playListData = ref([]);
+const playListId = ref<string | number | string[] | undefined>(
+  router.currentRoute.value.query.id as string | number | string[] | undefined,
+);
+
+interface PlaylistCreator {
+  nickname: string;
+}
+
+interface PlaylistDetail {
+  id: number;
+  name: string;
+  coverImgUrl: string;
+  creator: PlaylistCreator;
+  description?: string;
+  tags?: string[];
+  createTime?: number;
+  updateTime?: number;
+}
+
+const playListDetail = ref<PlaylistDetail | null>(null);
+const playListData = ref<unknown[]>([]);
 const playListDescShow = ref(false);
 const pagelimit = ref(30);
 const loadingState = ref(true);
-const pageNumber = ref(
-  router.currentRoute.value.query.page
-    ? Number(router.currentRoute.value.query.page)
-    : 1
+const pageNumber = ref<number>(
+  router.currentRoute.value.query.page ? Number(router.currentRoute.value.query.page) : 1,
 );
 const totalCount = ref(0);
 
-// 图标渲染
-const renderIcon = (icon) => {
-  return () => {
-    return h(
-      NIcon,
-      { style: { transform: "translateX(2px)" } },
-      {
-        default: () => icon,
-      }
-    );
-  };
-};
+const hasPlaylistDescription = computed(
+  () => !!playListDetail.value && !!playListDetail.value.description,
+);
+
+const playlistDescriptionHtml = computed(
+  () => playListDetail.value?.description?.replace(/\n/g, "<br>") ?? "",
+);
+
+const normalizePlaylistId = (id: string | number | string[]) =>
+  Number(Array.isArray(id) ? id[0] : id);
 
 // 判断收藏还是取消
-const isLikeOrDislike = (id) => {
+const isLikeOrDislike = (id: string | number | string[]) => {
   const playlists = user.getUserPlayLists.like;
   if (playlists.length) {
     return !playlists.some((item) => item.id === Number(id));
@@ -214,7 +234,7 @@ const isLikeOrDislike = (id) => {
 };
 
 // 判断是否可删除
-const isCanDelete = (id) => {
+const isCanDelete = (id: string | number | string[]) => {
   const playlists = user.getUserPlayLists.own;
   if (playlists.length) {
     return playlists.some((item) => item.id === Number(id));
@@ -223,7 +243,7 @@ const isCanDelete = (id) => {
 };
 
 // 歌单下拉菜单数据
-const dropdownOptions = ref([]);
+const dropdownOptions = ref<DropdownMixedOption[]>([]);
 
 // 更改歌单下拉菜单数据
 const setDropdownOptions = () => {
@@ -239,7 +259,7 @@ const setDropdownOptions = () => {
           if (navigator.clipboard) {
             try {
               navigator.clipboard.writeText(
-                `https://music.163.com/#/playlist?id=${playListId.value}`
+                `https://music.163.com/#/playlist?id=${playListId.value}`,
               );
               $message.success(t("general.message.copySuccess"));
             } catch (err) {
@@ -251,7 +271,7 @@ const setDropdownOptions = () => {
           }
         },
       },
-      icon: renderIcon(h(LinkTwo)),
+      icon: renderIcon(h(LinkTwo) as any),
     },
     {
       key: "del",
@@ -262,7 +282,7 @@ const setDropdownOptions = () => {
           toDelPlayList(playListDetail.value);
         },
       },
-      icon: renderIcon(h(DeleteFour)),
+      icon: renderIcon(h(DeleteFour) as any),
     },
     {
       key: "like",
@@ -275,16 +295,15 @@ const setDropdownOptions = () => {
           toChangeLike(playListId.value);
         },
       },
-      icon: renderIcon(h(isLikeOrDislike(playListId.value) ? Like : Unlike)),
+      icon: renderIcon(h(isLikeOrDislike(playListId.value) ? Like : Unlike) as any),
     },
   ];
 };
 
 // 获取歌单信息
-const getPlayListDetailData = (id) => {
-  getPlayListDetail(id)
+const getPlayListDetailData = (id: string | number | string[]) => {
+  getPlayListDetail(normalizePlaylistId(id))
     .then((res) => {
-      console.log(res);
       // 歌单总数
       totalCount.value = res.playlist.trackCount;
       // 歌单信息
@@ -294,34 +313,19 @@ const getPlayListDetailData = (id) => {
     .catch((err) => {
       $setSiteTitle(t("general.name.playlist"));
       loadingState.value = false;
-      console.error(
-        $message.error(t("general.message.acquisitionFailed")),
-        err
-      );
+      console.error(t("general.message.acquisitionFailed"), err);
       $message.error(t("general.message.acquisitionFailed"));
     });
 };
 
 // 获取歌单所有歌曲
-const getAllPlayListData = (id, limit = 30, offset = 0) => {
-  getAllPlayList(id, limit, offset).then((res) => {
-    console.log(res);
+const getAllPlayListData = (id: string | number | string[], limit = 30, offset = 0) => {
+  const sourceId = normalizePlaylistId(id);
+  getAllPlayList(sourceId, limit, offset).then((res) => {
     if (res.songs) {
-      playListData.value = [];
-      res.songs.forEach((v, i) => {
-        playListData.value.push({
-          id: v.id,
-          num: i + 1 + (pageNumber.value - 1) * pagelimit.value,
-          name: v.name,
-          artist: v.ar,
-          album: v.al,
-          alia: v.alia,
-          time: getSongTime(v.dt),
-          fee: v.fee,
-          sourceId: id,
-          pc: v.pc ? v.pc : null,
-          mv: v.mv ? v.mv : null,
-        });
+      playListData.value = transformSongData(res.songs, {
+        offset: (pageNumber.value - 1) * pagelimit.value,
+        sourceId,
       });
     } else {
       $message.error(t("general.message.acquisitionFailed"));
@@ -333,42 +337,11 @@ const getAllPlayListData = (id, limit = 30, offset = 0) => {
 
 // 播放歌单所有歌曲
 const playAllSong = () => {
-  try {
-    // 获取元素
-    const songDom = document.getElementById("datalists").firstElementChild;
-    const allSongDom = document.querySelectorAll("#datalists > *");
-    // 是否有元素存在 play
-    let isHasPlay = false;
-    // 遍历
-    allSongDom.forEach((child) => {
-      if (child.classList.contains("play")) {
-        isHasPlay = true;
-      }
-    });
-    if (!isHasPlay) {
-      // 双击操作
-      const event = new MouseEvent("dblclick", {
-        bubbles: true,
-        cancelable: true,
-        view: window,
-      });
-      // 双击或单击
-      if (setting.listClickMode === "dblclick") {
-        songDom.dispatchEvent(event);
-      } else if (setting.listClickMode === "click") {
-        songDom.click();
-      }
-    } else {
-      music.setPlayState(true);
-    }
-  } catch (err) {
-    console.error($message.error(t("general.message.operationFailed")), err);
-    $message.error($message.error(t("general.message.operationFailed")));
-  }
+  playAll(playListData.value);
 };
 
 // 删除歌单
-const toDelPlayList = (data) => {
+const toDelPlayList = (data: { id: number; name: any }) => {
   if (data.id === user.getUserPlayLists?.own[0].id) {
     $message.warning(t("menu.unableToDelete"));
     return false;
@@ -394,64 +367,30 @@ const toDelPlayList = (data) => {
 };
 
 // 收藏/取消收藏
-const toChangeLike = async (id) => {
-  const type = isLikeOrDislike(id) ? 1 : 2;
+const toChangeLike = async (id: string | number | string[]) => {
+  const type = isLikeOrDislike(id.toString()) ? 1 : 2;
   const likeMsg = t("general.name.playlist");
-  const isThereASpace = setting.language === "zh-CN" ? "" : " ";
   try {
-    const res = await likePlaylist(type, id);
+    const res = await likePlaylist(normalizePlaylistId(id), type);
     if (res.code === 200) {
-      $message.success(
-        `${likeMsg + isThereASpace}${
-          type == 1
-            ? t("menu.collection", { name: t("general.dialog.success") })
-            : t("menu.cancelCollection", { name: t("general.dialog.success") })
-        }`
-      );
+      $message.success(buildLikeMessage(t, likeMsg, type, "success", setting.language));
       user.setUserPlayLists(() => {
         setDropdownOptions();
       });
     } else {
-      $message.error(
-        `${likeMsg + isThereASpace}${
-          type == 1
-            ? t("menu.collection", { name: t("general.dialog.failed") })
-            : t("menu.cancelCollection", { name: t("general.dialog.failed") })
-        }`
-      );
+      $message.error(buildLikeMessage(t, likeMsg, type, "failed", setting.language));
     }
   } catch (err) {
-    $message.error(
-      `${likeMsg + isThereASpace}${
-        type == 1
-          ? t("menu.collection", { name: t("general.dialog.failed") })
-          : t("menu.cancelCollection", { name: t("general.dialog.failed") })
-      }`
-    );
-    console.error(
-      `${likeMsg + isThereASpace}${
-        type == 1
-          ? t("menu.collection", { name: t("general.dialog.failed") })
-          : t("menu.cancelCollection", { name: t("general.dialog.failed") })
-      }`,
-      err
-    );
+    console.error(buildLikeMessage(t, likeMsg, type, "failed", setting.language), err);
+    $message.error(buildLikeMessage(t, likeMsg, type, "failed", setting.language));
   }
 };
 
 onMounted(() => {
   if (playListId.value) {
     getPlayListDetailData(playListId.value);
-    getAllPlayListData(
-      playListId.value,
-      pagelimit.value,
-      (pageNumber.value - 1) * pagelimit.value
-    );
-    if (
-      user.userLogin &&
-      !user.getUserPlayLists.has &&
-      !user.getUserPlayLists.isLoading
-    ) {
+    getAllPlayListData(playListId.value, pagelimit.value, (pageNumber.value - 1) * pagelimit.value);
+    if (user.userLogin && !user.getUserPlayLists.has && !user.getUserPlayLists.isLoading) {
       user.setUserPlayLists(() => {
         setDropdownOptions();
       });
@@ -462,18 +401,13 @@ onMounted(() => {
 });
 
 // 每页个数数据变化
-const pageSizeChange = (val) => {
-  console.log(val);
+const pageSizeChange = (val: number) => {
   pagelimit.value = val;
-  getAllPlayListData(
-    playListId.value,
-    val,
-    (pageNumber.value - 1) * pagelimit.value
-  );
+  getAllPlayListData(playListId.value, val, (pageNumber.value - 1) * pagelimit.value);
 };
 
 // 当前页数数据变化
-const pageNumberChange = (val) => {
+const pageNumberChange = (val: number) => {
   router.push({
     path: "/playlist",
     query: {
@@ -487,25 +421,25 @@ const pageNumberChange = (val) => {
 watch(
   () => router.currentRoute.value,
   (val, oldVal) => {
-    playListId.value = val.query.id;
-    pageNumber.value = Number(val.query.page ? val.query.page : 1);
-    if (val.name == "playlist") {
-      if (val.query.id != oldVal.query.id) {
+    if (val.name === "playlist") {
+      playListId.value = val.query.id;
+      pageNumber.value = Number(val.query.page ? val.query.page : 1);
+      if (val.query.id !== oldVal?.query?.id) {
         getPlayListDetailData(playListId.value);
         getAllPlayListData(
           playListId.value,
           pagelimit.value,
-          (pageNumber.value - 1) * pagelimit.value
+          (pageNumber.value - 1) * pagelimit.value,
         );
       } else {
         getAllPlayListData(
           playListId.value,
           pagelimit.value,
-          (pageNumber.value - 1) * pagelimit.value
+          (pageNumber.value - 1) * pagelimit.value,
         );
       }
     }
-  }
+  },
 );
 </script>
 
@@ -578,6 +512,7 @@ watch(
           font-size: 28px;
           font-weight: bold;
           -webkit-line-clamp: 2;
+          line-clamp: 2;
         }
         .creator {
           margin-top: 6px;
@@ -600,6 +535,7 @@ watch(
         }
         .desc {
           -webkit-line-clamp: 4;
+          line-clamp: 4;
           line-height: 26px;
           margin-bottom: 16px;
         }
@@ -718,6 +654,7 @@ watch(
           }
           .desc {
             -webkit-line-clamp: 2;
+            line-clamp: 2;
             margin-bottom: 0;
           }
         }
@@ -780,6 +717,7 @@ watch(
         .title {
           .name {
             -webkit-line-clamp: 3;
+            line-clamp: 3;
           }
         }
         .control {

@@ -21,7 +21,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { AddCircleRound } from "@vicons/material";
 import { userStore } from "@/store";
 import { useI18n } from "vue-i18n";
@@ -34,8 +34,7 @@ const createPlaylistRef = ref(null);
 
 onMounted(() => {
   $setSiteTitle(t("nav.user") + " - " + t("nav.userChildren.playlist"));
-  if (!user.getUserPlayLists.has && !user.getUserPlayLists.isLoading)
-    user.setUserPlayLists();
+  if (!user.getUserPlayLists.has && !user.getUserPlayLists.isLoading) user.setUserPlayLists();
 });
 </script>
 

@@ -9,6 +9,7 @@
         :collapsed="gridCollapsed"
         :collapsed-rows="gridCollapsedRows"
         v-if="listData[0]"
+        key="data"
       >
         <n-gi
           class="item"
@@ -65,8 +66,10 @@
           </div>
         </n-gi>
       </n-grid>
+      <n-empty v-else-if="loading === false" key="empty" class="empty" />
       <n-grid
         v-else
+        key="loading"
         class="loading"
         x-gap="20"
         y-gap="26"
@@ -102,15 +105,7 @@
 
 <script setup>
 import { NIcon } from "naive-ui";
-import {
-  PlayOne,
-  Headset,
-  LinkTwo,
-  Like,
-  Unlike,
-  Editor,
-  DeleteFour,
-} from "@icon-park/vue-next";
+import { PlayOne, Headset, LinkTwo, Like, Unlike, Editor, DeleteFour } from "@icon-park/vue-next";
 import { useI18n } from "vue-i18n";
 import { delPlayList, likePlaylist } from "@/api/playlist";
 import { likeAlbum } from "@/api/album";
@@ -118,7 +113,7 @@ import { musicStore, userStore, settingStore } from "@/store";
 import { useRouter } from "vue-router";
 import AllArtists from "./AllArtists.vue";
 import PlaylistUpdate from "@/components/DataModal/PlaylistUpdate.vue";
-import getCoverUrl from "@/utils/getCoverUrl";
+import getCoverUrl from "@/utils/ncm/getCoverUrl";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -156,6 +151,11 @@ const props = defineProps({
     type: Number,
     default: 30,
   },
+  // 加载状态（null=旧行为，false=加载完成可显示空状态）
+  loading: {
+    type: Boolean,
+    default: null,
+  },
 });
 const playlistUpdateRef = ref(null);
 
@@ -167,7 +167,7 @@ const renderIcon = (icon) => {
       { style: { transform: "translateX(2px)" } },
       {
         default: () => icon,
-      }
+      },
     );
   };
 };
@@ -187,8 +187,7 @@ const openRightMenu = (e, data) => {
       {
         key: "update",
         label: t("menu.update"),
-        show:
-          router.currentRoute.value.name === "user-playlists" ? true : false,
+        show: router.currentRoute.value.name === "user-playlists" ? true : false,
         props: {
           onClick: () => {
             playlistUpdateRef.value.openUpdateModal(data);
@@ -199,8 +198,7 @@ const openRightMenu = (e, data) => {
       {
         key: "del",
         label: t("menu.del"),
-        show:
-          router.currentRoute.value.name === "user-playlists" ? true : false,
+        show: router.currentRoute.value.name === "user-playlists" ? true : false,
         props: {
           onClick: () => {
             toDelPlayList(data);
@@ -233,11 +231,7 @@ const openRightMenu = (e, data) => {
           ? t("menu.collection", { name: t("general.name.album") })
           : t("menu.cancelCollection", { name: t("general.name.album") }),
         show:
-          user.userLogin &&
-          user.getUserAlbumLists.has &&
-          props.listType === "album"
-            ? true
-            : false,
+          user.userLogin && user.getUserAlbumLists.has && props.listType === "album" ? true : false,
         props: {
           onClick: () => {
             toChangeLike(data.id);
@@ -249,9 +243,7 @@ const openRightMenu = (e, data) => {
         key: "copy",
         label: t("menu.copy", {
           name:
-            props.listType === "playlist"
-              ? t("general.name.playlist")
-              : t("general.name.album"),
+            props.listType === "playlist" ? t("general.name.playlist") : t("general.name.album"),
           other: t("general.name.link"),
         }),
         props: {
@@ -261,7 +253,7 @@ const openRightMenu = (e, data) => {
                 navigator.clipboard.writeText(
                   `https://music.163.com/#/${
                     props.listType === "playlist" ? "playlist" : "album"
-                  }?id=${data.id}`
+                  }?id=${data.id}`,
                 );
                 $message.success(t("general.message.copySuccess"));
               } catch (err) {
@@ -351,10 +343,7 @@ const toChangeLike = async (id) => {
   const listType = props.listType;
   const type = isLikeOrDislike(id) ? 1 : 2;
   const likeFn = listType === "playlist" ? likePlaylist : likeAlbum;
-  const likeMsg =
-    listType === "playlist"
-      ? t("general.name.playlist")
-      : t("general.name.album");
+  const likeMsg = listType === "playlist" ? t("general.name.playlist") : t("general.name.album");
   const isThereASpace = setting.language === "zh-CN" ? "" : " ";
   try {
     const res = await likeFn(type, id);
@@ -364,18 +353,16 @@ const toChangeLike = async (id) => {
           type == 1
             ? t("menu.collection", { name: t("general.dialog.success") })
             : t("menu.cancelCollection", { name: t("general.dialog.success") })
-        }`
+        }`,
       );
-      listType === "playlist"
-        ? user.setUserPlayLists()
-        : user.setUserAlbumLists();
+      listType === "playlist" ? user.setUserPlayLists() : user.setUserAlbumLists();
     } else {
       $message.error(
         `${likeMsg + isThereASpace}${
           type == 1
             ? t("menu.collection", { name: t("general.dialog.failed") })
             : t("menu.cancelCollection", { name: t("general.dialog.failed") })
-        }`
+        }`,
       );
     }
   } catch (err) {
@@ -384,7 +371,7 @@ const toChangeLike = async (id) => {
         type == 1
           ? t("menu.collection", { name: t("general.dialog.failed") })
           : t("menu.cancelCollection", { name: t("general.dialog.failed") })
-      }`
+      }`,
     );
     console.error(
       `${likeMsg + isThereASpace}${
@@ -392,16 +379,13 @@ const toChangeLike = async (id) => {
           ? t("menu.collection", { name: t("general.dialog.failed") })
           : t("menu.cancelCollection", { name: t("general.dialog.failed") })
       }`,
-      err
+      err,
     );
   }
 };
 
 onMounted(() => {
-  if (
-    router.currentRoute.value.name === "user-playlists" &&
-    !music.catList.sub
-  ) {
+  if (router.currentRoute.value.name === "user-playlists" && !music.catList.sub) {
     music.setCatList();
   }
   if (
@@ -589,6 +573,9 @@ onMounted(() => {
       border-radius: 8px !important;
       margin-bottom: 12px;
     }
+  }
+  .empty {
+    margin: 40px 0;
   }
   @media (max-width: 450px) {
     :deep(.n-grid) {

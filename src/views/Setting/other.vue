@@ -12,7 +12,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
@@ -20,9 +20,7 @@ const { t } = useI18n();
 // 程序重置
 const resetApp = () => {
   const cleanAll = () => {
-    $message
-      ? $message.success(t("other.cleanAll"))
-      : alert(t("other.cleanAll"));
+    $message ? $message.success(t("other.cleanAll")) : alert(t("other.cleanAll"));
     localStorage.clear();
     window.location.href = "/";
   };

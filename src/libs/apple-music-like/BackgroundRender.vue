@@ -10,7 +10,7 @@ import {
   BaseRenderer,
   MeshGradientRenderer,
 } from "@applemusic-like-lyrics/core";
-import { ref, onMounted, onUnmounted, watch, defineExpose } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 
 interface BackgroundRenderProps {
   album?: string;
@@ -21,7 +21,7 @@ interface BackgroundRenderProps {
   lowFreqVolume?: number;
   renderScale?: number;
   staticMode?: boolean;
-  renderer?: { new(canvas: HTMLCanvasElement): BaseRenderer };
+  renderer?: { new (canvas: HTMLCanvasElement): BaseRenderer };
 }
 
 const props = withDefaults(defineProps<BackgroundRenderProps>(), {
@@ -37,13 +37,10 @@ const wrapperRef = ref<HTMLDivElement | null>(null);
 
 onMounted(() => {
   coreBGRenderRef.value = CoreBackgroundRender.new(props.renderer ?? MeshGradientRenderer);
+
+  // Set initial values
   if (props.album) coreBGRenderRef.value?.setAlbum(props.album);
   if (props.fps) coreBGRenderRef.value?.setFPS(props.fps);
-  if (props.playing) {
-    coreBGRenderRef.value?.resume();
-  } else {
-    coreBGRenderRef.value?.pause();
-  }
   if (props.flowSpeed) coreBGRenderRef.value?.setFlowSpeed(props.flowSpeed);
   coreBGRenderRef.value?.setStaticMode(props.staticMode);
   coreBGRenderRef.value?.setRenderScale(props.renderScale);
@@ -56,47 +53,78 @@ onMounted(() => {
     el.style.height = "100%";
     wrapperRef.value?.appendChild(el);
   }
-});
 
-onUnmounted(() => {
-  coreBGRenderRef.value?.dispose();
-});
-
-watch(() => props.album, (newValue) => {
-  if (newValue) coreBGRenderRef.value?.setAlbum(newValue);
-});
-
-watch(() => props.fps, (newValue) => {
-  if (typeof newValue !== 'undefined') coreBGRenderRef.value?.setFPS(newValue);
-});
-
-watch(() => props.playing, (newValue) => {
-  if (newValue) {
+  // Set initial playing state
+  if (props.playing) {
     coreBGRenderRef.value?.resume();
   } else {
     coreBGRenderRef.value?.pause();
   }
 });
 
-watch(() => props.flowSpeed, (newValue) => {
-  if (typeof newValue !== 'undefined') coreBGRenderRef.value?.setFlowSpeed(newValue);
+onUnmounted(() => {
+  coreBGRenderRef.value?.dispose();
 });
 
-watch(() => props.staticMode, (newValue) => {
-  coreBGRenderRef.value?.setStaticMode(newValue);
-});
+watch(
+  () => props.album,
+  (newValue) => {
+    if (newValue) coreBGRenderRef.value?.setAlbum(newValue);
+  },
+);
 
-watch(() => props.renderScale, (newValue) => {
-  if (newValue) coreBGRenderRef.value?.setRenderScale(newValue);
-});
+watch(
+  () => props.fps,
+  (newValue) => {
+    if (typeof newValue !== "undefined") coreBGRenderRef.value?.setFPS(newValue);
+  },
+);
 
-watch(() => props.lowFreqVolume, (newValue) => {
-  if (newValue) coreBGRenderRef.value?.setLowFreqVolume(newValue);
-});
+watch(
+  () => props.playing,
+  (newValue) => {
+    if (newValue) {
+      coreBGRenderRef.value?.resume();
+    } else {
+      coreBGRenderRef.value?.pause();
+    }
+  },
+);
 
-watch(() => props.hasLyric, (newValue) => {
-  if (newValue !== undefined) coreBGRenderRef.value?.setHasLyric(newValue);
-});
+watch(
+  () => props.flowSpeed,
+  (newValue) => {
+    if (typeof newValue !== "undefined") coreBGRenderRef.value?.setFlowSpeed(newValue);
+  },
+);
+
+watch(
+  () => props.staticMode,
+  (newValue) => {
+    coreBGRenderRef.value?.setStaticMode(newValue);
+  },
+);
+
+watch(
+  () => props.renderScale,
+  (newValue) => {
+    if (newValue) coreBGRenderRef.value?.setRenderScale(newValue);
+  },
+);
+
+watch(
+  () => props.lowFreqVolume,
+  (newValue) => {
+    if (typeof newValue !== "undefined") coreBGRenderRef.value?.setLowFreqVolume(newValue);
+  },
+);
+
+watch(
+  () => props.hasLyric,
+  (newValue) => {
+    if (newValue !== undefined) coreBGRenderRef.value?.setHasLyric(newValue);
+  },
+);
 
 defineExpose({
   wrapperEl: wrapperRef,

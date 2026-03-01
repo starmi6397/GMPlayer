@@ -6,9 +6,7 @@
         :key="item"
         :id="'song' + index"
         :class="
-          music.getPlaySongData && music.getPlaySongData?.id == item?.id
-            ? 'songs play'
-            : 'songs'
+          music.getPlaySongData && music.getPlaySongData?.id == item?.id ? 'songs play' : 'songs'
         "
         :content-style="{
           padding: '16px',
@@ -18,9 +16,7 @@
           justifyContent: 'space-between',
         }"
         hoverable
-        @dblclick="
-          setting.listClickMode === 'dblclick' ? playSong(listData, item) : null
-        "
+        @dblclick="setting.listClickMode === 'dblclick' ? playSong(listData, item) : null"
         @click="checkCanClick(listData, item)"
         @contextmenu="openRightMenu($event, item)"
       >
@@ -51,14 +47,7 @@
             >
               {{ item?.fee == 1 ? "VIP" : "EP" }}
             </n-tag>
-            <n-tag
-              v-if="item?.pc"
-              class="cloud"
-              round
-              type="info"
-              size="small"
-              :bordered="false"
-            >
+            <n-tag v-if="item?.pc" class="cloud" round type="info" size="small" :bordered="false">
               {{ $t("general.name.cloud") }}
             </n-tag>
             <n-tag
@@ -74,24 +63,12 @@
             </n-tag>
           </div>
           <div class="meta">
-            <AllArtists
-              v-if="item?.artist"
-              class="text-hidden"
-              :artistsData="item?.artist"
-            />
-            <n-text
-              class="alia text-hidden"
-              depth="3"
-              v-if="item?.alia[0]"
-              v-html="item.alia[0]"
-            />
+            <AllArtists v-if="item?.artist" class="text-hidden" :artistsData="item?.artist" />
+            <n-text class="alia text-hidden" depth="3" v-if="item?.alia[0]" v-html="item.alia[0]" />
           </div>
         </div>
         <div class="album" v-if="!hideAlbum && item?.album">
-          <n-text
-            v-html="item.album.name"
-            @click.stop="jumpLink(item.album.id, 10)"
-          />
+          <n-text v-html="item.album.name" @click.stop="jumpLink(item.album.id, 10)" />
         </div>
         <div class="action">
           <n-icon
@@ -103,23 +80,12 @@
                 : music.changeLikeList(item?.id, true)
             "
           >
-            <Like
-              :theme="music.getSongIsLike(item?.id) ? 'filled' : 'outline'"
-            />
+            <Like :theme="music.getSongIsLike(item?.id) ? 'filled' : 'outline'" />
           </n-icon>
-          <n-icon
-            class="download"
-            size="20"
-            @click.stop="downloadSongRef.openDownloadModal(item)"
-          >
+          <n-icon class="download" size="20" @click.stop="downloadSongRef.openDownloadModal(item)">
             <DownloadFour theme="filled" />
           </n-icon>
-          <n-icon
-            class="more"
-            size="20"
-            :component="More"
-            @click.stop="openDrawer(item)"
-          />
+          <n-icon class="more" size="20" :component="More" @click.stop="openDrawer(item)" />
         </div>
         <n-text class="time" v-html="item.time" />
       </n-card>
@@ -169,10 +135,7 @@
               <n-text>{{ $t("menu.play") }}</n-text>
             </div>
             <div
-              v-if="
-                !music.getPersonalFmMode &&
-                music.getPlaySongData.id != drawerData.id
-              "
+              v-if="!music.getPersonalFmMode && music.getPlaySongData.id != drawerData.id"
               class="item"
               @click="
                 () => {
@@ -214,10 +177,7 @@
               </n-icon>
               <n-text>{{ $t("menu.download") }}</n-text>
             </div>
-            <div
-              class="item"
-              @click="router.push(`/comment?id=${drawerData.id}`)"
-            >
+            <div class="item" @click="router.push(`/comment?id=${drawerData.id}`)">
               <n-icon size="20">
                 <Comments theme="filled" />
               </n-icon>
@@ -253,22 +213,14 @@
               </n-icon>
               <n-text>
                 {{ $t("general.name.artists") }}:
-                <AllArtists
-                  class="text-hidden"
-                  :artistsData="drawerData.artist"
-                />
+                <AllArtists class="text-hidden" :artistsData="drawerData.artist" />
               </n-text>
             </div>
-            <div
-              class="item"
-              @click="router.push(`/album?id=${drawerData.album.id}`)"
-            >
+            <div class="item" @click="router.push(`/album?id=${drawerData.album.id}`)">
               <n-icon size="20">
                 <RecordDisc theme="filled" />
               </n-icon>
-              <n-text>
-                {{ $t("general.name.album") }}: {{ drawerData.album.name }}
-              </n-text>
+              <n-text> {{ $t("general.name.album") }}: {{ drawerData.album.name }} </n-text>
             </div>
             <div
               v-if="router.currentRoute.value.name === 'user-cloud'"
@@ -331,6 +283,7 @@
       <!-- 歌曲下载 -->
       <DownloadSong ref="downloadSongRef" />
     </div>
+    <n-empty v-else-if="loading === false" class="empty" />
     <n-spin class="loading" size="small" v-else />
   </Transition>
 </template>
@@ -356,7 +309,7 @@ import { musicStore, settingStore, userStore } from "@/store";
 import { useRouter } from "vue-router";
 import { setCloudDel } from "@/api/user";
 import { NIcon } from "naive-ui";
-import { soundStop } from "@/utils/Player";
+import { soundStop } from "@/utils/AudioContext";
 import { useI18n } from "vue-i18n";
 import AllArtists from "./AllArtists.vue";
 import AddPlaylist from "@/components/DataModal/AddPlaylist.vue";
@@ -384,6 +337,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // 加载状态（null=旧行为，false=加载完成可显示空状态）
+  loading: {
+    type: Boolean,
+    default: null,
+  },
 });
 
 // 右键菜单数据
@@ -404,7 +362,7 @@ const renderIcon = (icon, filled = true) => {
       { depth: 2, style: { transform: "translateX(2px)" } },
       {
         default: () => h(icon, { theme: filled ? "filled" : "outline" }),
-      }
+      },
     );
   };
 };
@@ -429,10 +387,7 @@ const openRightMenu = (e, data) => {
         key: "nextPlay",
         label: t("menu.nextPlay"),
         icon: renderIcon(AddMusic),
-        show:
-          music.getPersonalFmMode || music.getPlaySongData?.id == data.id
-            ? false
-            : true,
+        show: music.getPersonalFmMode || music.getPlaySongData?.id == data.id ? false : true,
         props: {
           onClick: () => {
             music.addSongToNext(data);
@@ -570,9 +525,7 @@ const onClickoutside = () => {
 const copySongData = (id, url = true) => {
   if (navigator.clipboard) {
     try {
-      navigator.clipboard.writeText(
-        url ? `https://music.163.com/#/song?id=${id}` : id
-      );
+      navigator.clipboard.writeText(url ? `https://music.163.com/#/song?id=${id}` : id);
       $message.success(t("general.message.copySuccess"));
     } catch (err) {
       console.error(t("general.message.copyFailure"), err);
@@ -677,7 +630,8 @@ const jumpLink = (id, type) => {
     cursor: pointer;
     &:hover {
       border-color: var(--main-color);
-      box-shadow: 0 1px 2px -2px var(--main-boxshadow-color),
+      box-shadow:
+        0 1px 2px -2px var(--main-boxshadow-color),
         0 3px 6px 0 var(--main-boxshadow-color),
         0 5px 12px 4px var(--main-boxshadow-hover-color);
       .action {
@@ -740,6 +694,7 @@ const jumpLink = (id, type) => {
         flex-direction: row;
         .n-text {
           -webkit-line-clamp: 2;
+          line-clamp: 2;
           font-weight: bold;
           transition: all 0.3s;
           &:hover {
@@ -766,6 +721,7 @@ const jumpLink = (id, type) => {
         .artists {
           margin-top: 2px;
           -webkit-line-clamp: 2;
+          line-clamp: 2;
         }
         .alia {
           margin-top: 2px;
@@ -832,6 +788,9 @@ const jumpLink = (id, type) => {
   flex-direction: row;
   justify-content: center;
   align-items: center;
+}
+.empty {
+  margin: 40px 0;
 }
 .drawer {
   .menu {

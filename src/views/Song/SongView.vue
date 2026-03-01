@@ -26,12 +26,7 @@
       <div class="right">
         <div class="intr">
           <n-text class="name text-hidden" v-html="musicDetail.name" />
-          <n-text
-            depth="3"
-            class="alia"
-            v-if="musicDetail.alia[0]"
-            v-html="musicDetail.alia[0]"
-          />
+          <n-text depth="3" class="alia" v-if="musicDetail.alia[0]" v-html="musicDetail.alia[0]" />
           <n-space class="tag">
             <n-tag
               v-if="musicDetail.fee == 1 || musicDetail.fee == 4"
@@ -41,23 +36,13 @@
             >
               {{ musicDetail.fee == 1 ? "VIP" : "EP" }}
             </n-tag>
-            <n-tag
-              v-if="musicDetail.pc"
-              class="cloud"
-              round
-              type="info"
-              :bordered="false"
-            >
+            <n-tag v-if="musicDetail.pc" class="cloud" round type="info" :bordered="false">
               {{ $t("general.name.cloud") }}
             </n-tag>
           </n-space>
           <div class="item">
             <n-icon :depth="3" :component="People" />
-            <AllArtists
-              v-if="musicDetail.ar"
-              :artistsData="musicDetail.ar"
-              :isDark="false"
-            />
+            <AllArtists v-if="musicDetail.ar" :artistsData="musicDetail.ar" :isDark="false" />
           </div>
           <div class="item">
             <n-icon :depth="3" :component="RecordDisc" />
@@ -69,39 +54,23 @@
           </div>
           <div class="item" v-if="musicDetail.publishTime">
             <n-icon :depth="3" :component="Time" />
-            <n-text
-              class="text"
-              v-html="getLongTime(musicDetail.publishTime)"
-            />
+            <n-text class="text" v-html="getLongTime(musicDetail.publishTime)" />
           </div>
         </div>
         <n-space class="button">
-          <n-button
-            type="primary"
-            strong
-            secondary
-            @click="addSong(musicDetail)"
-          >
+          <n-button type="primary" strong secondary @click="addSong(musicDetail)">
             <template #icon>
               <n-icon :component="PlayOne" />
             </template>
             {{ $t("general.name.play") }}
           </n-button>
-          <n-button
-            strong
-            secondary
-            @click="addPlayListRef.openAddToPlaylist(musicId)"
-          >
+          <n-button strong secondary @click="addPlayListRef.openAddToPlaylist(musicId)">
             <template #icon>
               <n-icon :component="ListAdd" />
             </template>
             {{ $t("general.name.add") }}
           </n-button>
-          <n-button
-            strong
-            secondary
-            @click="router.push(`/comment?id=${musicDetail.id}&page=1`)"
-          >
+          <n-button strong secondary @click="router.push(`/comment?id=${musicDetail.id}&page=1`)">
             <template #icon>
               <n-icon :component="Comments" />
             </template>
@@ -137,28 +106,20 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { getSimiPlayList, getMusicDetail } from "@/api/song";
 import { getComment } from "@/api/comment";
 import { useRouter } from "vue-router";
 import { musicStore } from "@/store";
-import { getLongTime } from "@/utils/timeTools";
-import {
-  PlayOne,
-  Comments,
-  ListAdd,
-  Youtube,
-  People,
-  RecordDisc,
-  Time,
-} from "@icon-park/vue-next";
+import { getLongTime, getSongTime } from "@/utils/timeTools";
+import { PlayOne, Comments, ListAdd, Youtube, People, RecordDisc, Time } from "@icon-park/vue-next";
 import { formatNumber } from "@/utils/timeTools";
 import { useI18n } from "vue-i18n";
 import AllArtists from "@/components/DataList/AllArtists.vue";
 import CoverLists from "@/components/DataList/CoverLists.vue";
 import AddPlaylist from "@/components/DataModal/AddPlaylist.vue";
 import Comment from "@/components/Comment/index.vue";
-import getCoverUrl from "@/utils/getCoverUrl";
+import getCoverUrl from "@/utils/ncm/getCoverUrl";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -182,11 +143,7 @@ const getMusicDetailData = (id) => {
     if (res.songs[0]) {
       musicDetail.value = res.songs[0];
       $setSiteTitle(
-        res.songs[0].name +
-          " - " +
-          res.songs[0].ar[0].name +
-          " - " +
-          t("general.name.song")
+        res.songs[0].name + " - " + res.songs[0].ar[0].name + " - " + t("general.name.song"),
       );
       // 获取热门评论
       getCommentData(id);
@@ -240,6 +197,7 @@ const addSong = (data) => {
     fee: data.fee,
     id: data.id,
     name: data.name,
+    time: getSongTime(data.dt),
   };
   console.log(song);
   music.setPersonalFmMode(false);
@@ -260,7 +218,7 @@ watch(
     if (val.name == "song") {
       getMusicDetailData(musicId.value);
     }
-  }
+  },
 );
 </script>
 

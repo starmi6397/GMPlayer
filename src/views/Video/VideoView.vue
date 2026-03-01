@@ -36,11 +36,7 @@
             <n-skeleton text style="width: 60%" />
           </div>
           <div class="content">
-            <Comment
-              v-for="item in commentData.hotComments"
-              :key="item"
-              :commentData="item"
-            />
+            <Comment v-for="item in commentData.hotComments" :key="item" :commentData="item" />
           </div>
         </div>
         <div class="allComments" ref="allCommentsRef">
@@ -53,11 +49,7 @@
             <n-skeleton text style="width: 60%" />
           </div>
           <div class="content">
-            <Comment
-              v-for="item in commentData.allComments"
-              :key="item"
-              :commentData="item"
-            />
+            <Comment v-for="item in commentData.allComments" :key="item" :commentData="item" />
           </div>
         </div>
         <Pagination
@@ -74,17 +66,13 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useRouter } from "vue-router";
 import { musicStore, settingStore } from "@/store";
 import { getVideoDetail, getVideoUrl, getSimiVideo } from "@/api/video";
 import { getComment } from "@/api/comment";
 import { formatNumber, getSongTime } from "@/utils/timeTools";
-import {
-  OndemandVideoFilled,
-  ShareFilled,
-  MessageOutlined,
-} from "@vicons/material";
+import { OndemandVideoFilled, ShareFilled, MessageOutlined } from "@vicons/material";
 import { useI18n } from "vue-i18n";
 import VideoLists from "@/components/DataList/VideoLists.vue";
 import AllArtists from "@/components/DataList/AllArtists.vue";
@@ -92,6 +80,7 @@ import Comment from "@/components/Comment/index.vue";
 import Pagination from "@/components/Pagination/index.vue";
 import Plyr from "plyr";
 import "plyr/dist/plyr.css";
+import type { CommentResourceType } from "@/api";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -149,11 +138,7 @@ const getVideoData = (id) => {
   getVideoDetail(id).then((res) => {
     videoData.value = res.data;
     $setSiteTitle(
-      res.data.name +
-        " - " +
-        res.data.artists[0].name +
-        " - " +
-        t("general.name.videos")
+      res.data.name + " - " + res.data.artists[0].name + " - " + t("general.name.videos"),
     );
     const requests = res.data.brs.map((v) => {
       return getVideoUrl(id, v.br);
@@ -199,7 +184,7 @@ const getVideoData = (id) => {
 };
 
 // 获取评论数据
-const getCommentData = (id, offset = 0, type = "mv") => {
+const getCommentData = (id, offset = 0, type: CommentResourceType = "mv") => {
   // 获取 before
   let before = null;
   if (commentData.allComments[0] && offset >= 5000) {
@@ -239,9 +224,25 @@ onMounted(() => {
   });
 });
 
-onBeforeUnmount(() => {
-  // 恢复控制条
+onActivated(() => {
+  // keep-alive 复用时也需隐藏控制条
+  music.setPlayBarState(false);
+});
+
+onDeactivated(() => {
+  // keep-alive 缓存时恢复控制条，暂停视频
   music.setPlayBarState(true);
+  if (player.value) {
+    player.value.pause();
+  }
+});
+
+onBeforeUnmount(() => {
+  // 恢复控制条，销毁播放器
+  music.setPlayBarState(true);
+  if (player.value) {
+    player.value.destroy();
+  }
 });
 
 // 监听路由参数变化
@@ -253,7 +254,7 @@ watch(
       getVideoData(val.query.id);
       getCommentData(val.query.id);
     }
-  }
+  },
 );
 </script>
 

@@ -1,6 +1,6 @@
 <template>
   <div class="videos">
-    <VideoLists :listData="searchData" />
+    <VideoLists :listData="searchData" :loading="loading" />
     <Pagination
       v-if="searchData[0]"
       :pageNumber="pageNumber"
@@ -11,13 +11,14 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { getSearchData } from "@/api/search";
 import { useRouter } from "vue-router";
 import { formatNumber, getSongTime } from "@/utils/timeTools";
 import { useI18n } from "vue-i18n";
 import VideoLists from "@/components/DataList/VideoLists.vue";
 import Pagination from "@/components/Pagination/index.vue";
+import type { SearchType } from "@/api";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -25,16 +26,16 @@ const router = useRouter();
 // 搜索数据
 const searchKeywords = ref(router.currentRoute.value.query.keywords);
 const searchData = ref([]);
+const loading = ref(true);
 const totalCount = ref(0);
 const pagelimit = ref(30);
 const pageNumber = ref(
-  router.currentRoute.value.query.page
-    ? Number(router.currentRoute.value.query.page)
-    : 1
+  router.currentRoute.value.query.page ? Number(router.currentRoute.value.query.page) : 1,
 );
 
 // 获取搜索数据
-const getSearchDataList = (keywords, limit = 30, offset = 0, type = 1004) => {
+const getSearchDataList = (keywords, limit = 30, offset = 0, type: SearchType = 1004) => {
+  loading.value = true;
   getSearchData(keywords, limit, offset, type).then((res) => {
     console.log(res);
     // 数据总数
@@ -53,8 +54,9 @@ const getSearchDataList = (keywords, limit = 30, offset = 0, type = 1004) => {
         });
       });
     } else {
-      $message.error(t("general.message.acquisitionFailed"));
+      $message.info(t("nav.search.noSuggestions"));
     }
+    loading.value = false;
     // 请求后回顶
     if (typeof $scrollToTop !== "undefined") $scrollToTop();
   });
@@ -64,27 +66,23 @@ const getSearchDataList = (keywords, limit = 30, offset = 0, type = 1004) => {
 watch(
   () => router.currentRoute.value,
   (val) => {
-    searchKeywords.value = val.query.keywords;
-    pageNumber.value = Number(val.query.page ? val.query.page : 1);
     if (val.name == "s-videos") {
+      searchKeywords.value = val.query.keywords;
+      pageNumber.value = Number(val.query.page ? val.query.page : 1);
       getSearchDataList(
         searchKeywords.value,
         pagelimit.value,
-        (pageNumber.value - 1) * pagelimit.value
+        (pageNumber.value - 1) * pagelimit.value,
       );
     }
-  }
+  },
 );
 
 // 每页个数数据变化
 const pageSizeChange = (val) => {
   console.log(val);
   pagelimit.value = val;
-  getSearchDataList(
-    searchKeywords.value,
-    val,
-    (pageNumber.value - 1) * pagelimit.value
-  );
+  getSearchDataList(searchKeywords.value, val, (pageNumber.value - 1) * pagelimit.value);
 };
 
 // 当前页数数据变化
@@ -102,7 +100,7 @@ onMounted(() => {
   getSearchDataList(
     searchKeywords.value,
     pagelimit.value,
-    (pageNumber.value - 1) * pagelimit.value
+    (pageNumber.value - 1) * pagelimit.value,
   );
 });
 </script>

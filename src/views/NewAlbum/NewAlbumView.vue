@@ -8,7 +8,7 @@
         class="tag"
         round
         v-for="item in albumArea"
-        :key="item"
+        :key="item.label"
         :bordered="false"
         :type="item.value == albumAreaChoose ? 'primary' : 'default'"
         @click="changeArea(item.value)"
@@ -27,7 +27,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { getAlbumNew } from "@/api/album";
 import { useRouter } from "vue-router";
 import { getLongTime } from "@/utils/timeTools";
@@ -43,14 +43,10 @@ const newAlbumData = ref([]);
 const totalCount = ref(0);
 const pagelimit = ref(30);
 const pageNumber = ref(
-  router.currentRoute.value.query.page
-    ? Number(router.currentRoute.value.query.page)
-    : 1
+  router.currentRoute.value.query.page ? Number(router.currentRoute.value.query.page) : 1,
 );
 const albumAreaChoose = ref(
-  router.currentRoute.value.query.area
-    ? router.currentRoute.value.query.area
-    : "ALL"
+  router.currentRoute.value.query.area ? router.currentRoute.value.query.area : "ALL",
 );
 const albumArea = [
   {
@@ -105,27 +101,23 @@ const getAlbumNewData = (area, limit = 30, offset = 0) => {
 watch(
   () => router.currentRoute.value,
   (val) => {
-    albumAreaChoose.value = val.query.area ? val.query.area : "ALL";
-    pageNumber.value = Number(val.query.page ? val.query.page : 1);
     if (val.name == "new-album") {
+      albumAreaChoose.value = val.query.area ? val.query.area : "ALL";
+      pageNumber.value = Number(val.query.page ? val.query.page : 1);
       getAlbumNewData(
         albumAreaChoose.value,
         pagelimit.value,
-        (pageNumber.value - 1) * pagelimit.value
+        (pageNumber.value - 1) * pagelimit.value,
       );
     }
-  }
+  },
 );
 
 // 每页个数数据变化
 const pageSizeChange = (val) => {
   console.log(val);
   pagelimit.value = val;
-  getAlbumNewData(
-    albumAreaChoose.value,
-    val,
-    (pageNumber.value - 1) * pagelimit.value
-  );
+  getAlbumNewData(albumAreaChoose.value, val, (pageNumber.value - 1) * pagelimit.value);
 };
 
 // 当前页数数据变化
@@ -152,11 +144,7 @@ const changeArea = (area) => {
 
 onMounted(() => {
   $setSiteTitle(t("home.title.newAlbum"));
-  getAlbumNewData(
-    albumAreaChoose.value,
-    pagelimit.value,
-    (pageNumber.value - 1) * pagelimit.value
-  );
+  getAlbumNewData(albumAreaChoose.value, pagelimit.value, (pageNumber.value - 1) * pagelimit.value);
 });
 </script>
 

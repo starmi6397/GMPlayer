@@ -45,11 +45,7 @@
             @click="toLikeArtist(artistData)"
           >
             <template #icon>
-              <n-icon
-                :component="
-                  artistLikeBtn ? PersonAddAlt1Round : PersonRemoveAlt1Round
-                "
-              />
+              <n-icon :component="artistLikeBtn ? PersonAddAlt1Round : PersonRemoveAlt1Round" />
             </template>
             {{
               artistLikeBtn
@@ -77,12 +73,7 @@
     <div class="error" v-else-if="!artistId">
       <n-text>{{ $t("general.name.noKeywords") }}</n-text>
       <br />
-      <n-button
-        strong
-        secondary
-        @click="router.go(-1)"
-        style="margin-top: 20px"
-      >
+      <n-button strong secondary @click="router.go(-1)" style="margin-top: 20px">
         {{ $t("general.name.goBack") }}
       </n-button>
     </div>
@@ -98,21 +89,18 @@
       <n-tab name="videos"> MV </n-tab>
     </n-tabs>
     <main class="content" v-if="artistData">
-      <router-view
-        v-slot="{ Component }"
-        :mvSize="artistData ? artistData.mvSize : null"
-      >
-        <keep-alive>
-          <Transition name="move" mode="out-in">
+      <router-view v-slot="{ Component }" :mvSize="artistData ? artistData.mvSize : null">
+        <Transition :name="transitionName" mode="out-in">
+          <keep-alive>
             <component :is="Component" />
-          </Transition>
-        </keep-alive>
+          </keep-alive>
+        </Transition>
       </router-view>
     </main>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useRouter } from "vue-router";
 import { userStore } from "@/store";
 import { getArtistDetail, likeArtist } from "@/api/artist";
@@ -124,10 +112,16 @@ import {
   PersonRemoveAlt1Round,
 } from "@vicons/material";
 import { useI18n } from "vue-i18n";
+import { useTabTransition } from "@/composables/useTabTransition";
 
 const { t } = useI18n();
 const router = useRouter();
 const user = userStore();
+const { transitionName, updateDirection, syncIndex } = useTabTransition([
+  "songs",
+  "albums",
+  "videos",
+]);
 
 // 歌手数据
 const artistId = ref(router.currentRoute.value.query.id);
@@ -137,11 +131,12 @@ const artistLikeBtn = ref(false);
 
 // Tab 默认选中
 const tabValue = ref(router.currentRoute.value.path.split("/")[2]);
+syncIndex(tabValue.value);
 
 // 获取歌手数据
-const getArtistDetailData = (id) => {
+const getArtistDetailData = (id: string | number | string[]) => {
   if (id) {
-    getArtistDetail(id)
+    getArtistDetail(Number(id))
       .then((res) => {
         console.log(res);
         artistData.value = {
@@ -167,8 +162,8 @@ const getArtistDetailData = (id) => {
 };
 
 // Tab 选项卡变化
-const tabChange = (value) => {
-  console.log(value);
+const tabChange = (value: any) => {
+  updateDirection(value);
   router.push({
     path: `/artist/${value}`,
     query: {
@@ -179,11 +174,9 @@ const tabChange = (value) => {
 };
 
 // 判断收藏还是取消
-const isLikeOrDislike = (id) => {
+const isLikeOrDislike = (id: string | string[]) => {
   if (user.getUserArtistLists.list[0]) {
-    const index = user.getUserArtistLists.list.findIndex(
-      (item) => item.id === Number(id)
-    );
+    const index = user.getUserArtistLists.list.findIndex((item) => item.id === Number(id));
     if (index !== -1) {
       return false;
     }
@@ -194,8 +187,8 @@ const isLikeOrDislike = (id) => {
 };
 
 // 收藏/取消收藏歌手
-const toLikeArtist = (data) => {
-  const type = isLikeOrDislike(data.id) ? 1 : 2;
+const toLikeArtist = (data: { id: number; name: any }) => {
+  const type = isLikeOrDislike(data.id.toString()) ? 1 : 2;
   likeArtist(type, data.id).then((res) => {
     if (res.code === 200) {
       $message.success(
@@ -203,7 +196,7 @@ const toLikeArtist = (data) => {
           type == 1
             ? t("menu.collection", { name: t("general.dialog.success") })
             : t("menu.cancelCollection", { name: t("general.dialog.success") })
-        }`
+        }`,
       );
       user.setUserArtistLists(() => {
         artistLikeBtn.value = isLikeOrDislike(artistId.value);
@@ -214,7 +207,7 @@ const toLikeArtist = (data) => {
           type == 1
             ? t("menu.collection", { name: t("general.dialog.failed") })
             : t("menu.cancelCollection", { name: t("general.dialog.failed") })
-        }`
+        }`,
       );
     }
   });
@@ -223,11 +216,7 @@ const toLikeArtist = (data) => {
 onMounted(() => {
   getArtistDetailData(artistId.value);
   artistLikeBtn.value = isLikeOrDislike(artistId.value);
-  if (
-    user.userLogin &&
-    !user.getUserArtistLists.has &&
-    !user.getUserArtistLists.isLoading
-  ) {
+  if (user.userLogin && !user.getUserArtistLists.has && !user.getUserArtistLists.isLoading) {
     user.setUserArtistLists(() => {
       console.log("执行回调", artistId.value, isLikeOrDislike(artistId.value));
       artistLikeBtn.value = isLikeOrDislike(artistId.value);
@@ -241,11 +230,12 @@ watch(
   (val) => {
     artistId.value = val.query.id;
     tabValue.value = val.path.split("/")[2];
+    syncIndex(tabValue.value);
     artistLikeBtn.value = isLikeOrDislike(artistId.value);
     if (val.path.split("/")[1] == "artist") {
       getArtistDetailData(artistId.value);
     }
-  }
+  },
 );
 </script>
 
@@ -337,6 +327,7 @@ watch(
       .desc {
         margin-top: 12px;
         -webkit-line-clamp: 2;
+        line-clamp: 2;
         cursor: pointer;
         transition: all 0.3s;
         &:hover {
@@ -349,18 +340,9 @@ watch(
     }
   }
   .content {
+    position: relative;
+    overflow: hidden;
     margin-top: 20px;
   }
-}
-// 路由跳转动画
-.move-enter-active,
-.move-leave-active {
-  transition: all 0.2s ease;
-}
-
-.move-enter-from,
-.move-leave-to {
-  opacity: 0;
-  transform: translateX(10px);
 }
 </style>

@@ -2,7 +2,7 @@
   <div class="comment">
     <Transition name="up">
       <n-card
-        v-if="music.getPlaySongData && music.getPlaySongData.id != songId"
+        v-if="music.getPlaySongData && music.getPlaySongData.id != Number(songId)"
         class="goback"
         @click="router.push(`/comment?id=${music.getPlaySongData.id}&page=1`)"
         content-style="padding: 6px"
@@ -13,18 +13,13 @@
     <div class="title" v-if="songId">
       <span class="key">{{ $t("general.name.allComments") }}</span>
       <n-card class="song">
-        <SmallSongData :getDataByID="songId" />
+        <SmallSongData :getDataByID="songId.toString()" />
       </n-card>
     </div>
     <div class="title" v-else>
       <span class="key">{{ $t("general.name.noKeywords") }}</span>
       <br />
-      <n-button
-        strong
-        secondary
-        @click="router.go(-1)"
-        style="margin-top: 20px"
-      >
+      <n-button strong secondary @click="router.go(-1)" style="margin-top: 20px">
         {{ $t("general.name.goBack") }}
       </n-button>
     </div>
@@ -36,11 +31,7 @@
           <n-skeleton text style="width: 60%" />
         </div>
         <div class="content">
-          <Comment
-            v-for="item in commentData.hotComments"
-            :key="item"
-            :commentData="item"
-          />
+          <Comment v-for="item in commentData.hotComments" :key="item" :commentData="item" />
         </div>
       </div>
       <div class="allComments" ref="allCommentsRef">
@@ -53,11 +44,7 @@
           <n-skeleton text style="width: 60%" />
         </div>
         <div class="content">
-          <Comment
-            v-for="item in commentData.allComments"
-            :key="item"
-            :commentData="item"
-          />
+          <Comment v-for="item in commentData.allComments" :key="item" :commentData="item" />
         </div>
       </div>
       <Pagination
@@ -70,7 +57,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { musicStore } from "@/store";
 import { useRouter } from "vue-router";
 import { getComment } from "@/api/comment";
@@ -86,9 +73,7 @@ const music = musicStore();
 // 歌曲信息
 const songId = ref(router.currentRoute.value.query.id);
 const pageNumber = ref(
-  router.currentRoute.value.query.page
-    ? Number(router.currentRoute.value.query.page)
-    : 1
+  router.currentRoute.value.query.page ? Number(router.currentRoute.value.query.page) : 1,
 );
 
 // 评论数据
@@ -101,13 +86,13 @@ const commentData = reactive({
 const commentsCount = ref(0);
 
 // 获取评论数据
-const getCommentData = (id, offset = 0) => {
+const getCommentData = (id: string | number | string[], offset = 0) => {
   // 获取 before
   let before = null;
   if (commentData.allComments[0] && offset >= 5000) {
     before = commentData.allComments[commentData.allComments.length - 1].time;
   }
-  getComment(id, offset, before).then((res) => {
+  getComment(Number(id), offset, before).then((res) => {
     // 写入数据
     if (res.comments && res.comments[0]) {
       if (res.hotComments) {
@@ -127,7 +112,7 @@ const getCommentData = (id, offset = 0) => {
 };
 
 // 当前页数数据变化
-const pageNumberChange = (val) => {
+const pageNumberChange = (val: number) => {
   router.push({
     path: "/comment",
     query: {
@@ -147,12 +132,12 @@ onMounted(() => {
 watch(
   () => router.currentRoute.value,
   (val) => {
-    pageNumber.value = Number(val.query.page ? val.query.page : 1);
     if (val.name == "comment") {
+      pageNumber.value = Number(val.query.page ? val.query.page : 1);
       songId.value = val.query.id;
       getCommentData(val.query.id, (pageNumber.value - 1) * 20);
     }
-  }
+  },
 );
 </script>
 
