@@ -267,7 +267,8 @@
 </template>
 
 <script setup>
-import { getMusicUrl, getMusicNumUrl, getMusicDetail, getUnifiedLyric } from "@/api/song";
+import { getMusicDetail } from "@/api/song";
+import { resolveSongUrl } from "@/utils/AudioContext/resolveSongUrl";
 import { Motion, AnimatePresence } from "motion-v";
 import { NIcon } from "naive-ui";
 import {
@@ -312,8 +313,9 @@ import AllArtists from "@/components/DataList/AllArtists.vue";
 import BigPlayer from "./BigPlayer/index.vue";
 import "vue-slider-component/theme/default.css";
 import { watch, toRaw } from "vue";
-import { parseLyricData as parseLyric, formatAsLrc as formatToLrc } from "@/utils/LyricsProcessor";
+import { parseLyricData as parseLyric } from "@/utils/LyricsProcessor";
 import { preprocessLyrics, getProcessedLyrics } from "@/utils/LyricsProcessor";
+import { lyricFetcher } from "@/utils/lyricFetcher";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -327,9 +329,6 @@ const PlayListDrawerRef = ref(null);
 // 一起听歌模态框
 const showListenTogetherModal = ref(false);
 
-// UNM 是否存在
-const useUnmServerHas = import.meta.env.VITE_UNM_API ? true : false;
-
 // 音频标签
 const player = ref(null);
 
@@ -339,7 +338,7 @@ const player = ref(null);
 let _songLoadGeneration = 0;
 
 // 获取歌曲播放数据
-const getPlaySongData = (data, level = setting.songLevel) => {
+const getPlaySongData = async (data, level = setting.songLevel) => {
   const generation = ++_songLoadGeneration;
   try {
     if (!data || !data.id) {
@@ -376,50 +375,24 @@ const getPlaySongData = (data, level = setting.songLevel) => {
       return;
     }
 
-    // VIP 歌曲或需要购买专辑
-    if (useUnmServerHas && setting.useUnmServer && !pc && (fee === 1 || fee === 4)) {
-      console.log("[Player] Attempting UNM server for VIP/paid song.");
-      getMusicNumUrlData(id, generation);
+    // Unified URL resolution (NCM + trial detection + UNM fallback + kuwo proxy)
+    const result = await resolveSongUrl({ id, fee, pc, name: data.name }, level);
+    if (generation !== _songLoadGeneration) return; // stale check
+
+    if (result) {
+      console.log(`[Player] Creating sound instance with ${result.source} URL: ${result.url}`);
+      player.value = createSound(result.url);
+    } else {
+      console.warn(`[Player] No URL resolved for ${id}`);
+      $message.warning(t("general.message.playError"));
+      music.setPlaySongIndex("next");
     }
-    // 免费或无版权 — fetch URL directly (avoids checkMusicCanUse race condition
-    // where the login session may not be established yet on page reload, causing
-    // the availability check to fail and all songs to fallback to UNM).
-    else {
-      console.log(`[Player] Fetching official URL directly for ${id}.`);
-      getMusicUrl(id, level)
-        .then((res) => {
-          if (generation !== _songLoadGeneration) return;
-          console.log(`[Player] getMusicUrl response for ${id}:`, res);
-          if (res.data && res.data[0] && res.data[0].url) {
-            const url = res.data[0].url.replace(/^http:/, "https:");
-            console.log(`[Player] Creating sound instance with official URL: ${url}`);
-            player.value = createSound(url);
-          } else {
-            console.warn(`[Player] No official URL for ${id}, trying UNM fallback.`);
-            if (useUnmServerHas && setting.useUnmServer) {
-              getMusicNumUrlData(id, generation);
-            } else {
-              $message.warning(t("general.message.playError"));
-              music.setPlaySongIndex("next");
-            }
-          }
-        })
-        .catch((err) => {
-          if (generation !== _songLoadGeneration) return;
-          console.error(`[Player] Error fetching official URL for ${id}:`, err);
-          if (useUnmServerHas && setting.useUnmServer) {
-            console.warn(`[Player] Official URL fetch failed for ${id}, falling back to UNM.`);
-            getMusicNumUrlData(id, generation);
-          } else {
-            $message.warning(t("general.message.playError"));
-            music.setPlaySongIndex("next");
-          }
-        });
-    }
-    // 获取歌词 (using the new unified function)
+
+    // 获取歌词
     fetchAndParseLyric(id);
   } catch (err) {
-    console.error("[Player] Error in getPlaySongData main block:", err);
+    if (generation !== _songLoadGeneration) return;
+    console.error("[Player] Error in getPlaySongData:", err);
     if (music.getPlaylists[0] && music.getPlayState) {
       $message.warning(t("general.message.playError"));
       music.setPlaySongIndex("next");
@@ -438,39 +411,6 @@ const renderIcon = (icon) => {
       },
     );
   };
-};
-
-// 网易云解灰
-const getMusicNumUrlData = (id, generation) => {
-  console.log(`[Player] getMusicNumUrlData called for ID: ${id}`);
-  getMusicNumUrl(id)
-    .then((res) => {
-      if (generation !== _songLoadGeneration) return;
-      console.log(`[Player] getMusicNumUrl response for ${id}:`, res);
-      if (res.code === 200 && res.data && res.data.url) {
-        const songUrl = res.data.url.replace(/^http:/, "");
-        // 匹配酷我域名
-        const pattern = /kuwo\\.cn/i;
-        if (pattern.test(songUrl) && res.data?.proxyUrl) {
-          const proxyUrl = res.data.proxyUrl; // Assuming proxyUrl doesn't need https replace
-          console.log(`[Player] Creating sound instance with UNM Proxy URL: ${proxyUrl}`);
-          player.value = createSound(proxyUrl);
-        } else {
-          console.log(`[Player] Creating sound instance with UNM URL: ${songUrl}`);
-          player.value = createSound(songUrl);
-        }
-      } else {
-        console.error(`[Player] Invalid data from getMusicNumUrl for ${id}:`, res);
-        $message.warning(t("general.message.playError"));
-        music.setPlaySongIndex("next");
-      }
-    })
-    .catch((err) => {
-      if (generation !== _songLoadGeneration) return;
-      console.error(`[Player] Error in getMusicNumUrl request for ${id}:`, err);
-      $message.warning(t("general.message.playError"));
-      music.setPlaySongIndex("next");
-    });
 };
 
 // 歌曲进度条更新
@@ -1039,33 +979,20 @@ watch(
   },
 );
 
-const fetchAndParseLyric = (id) => {
-  const useTTMLRepo = setting.useTTMLRepo;
-
-  getUnifiedLyric(id, useTTMLRepo)
-    .then((lyricData) => {
-      console.log(
-        `[Player] Unified Lyric data received for ${id} (using TTML repo: ${useTTMLRepo})`,
-      );
-
-      const parsedResult = parseLyric(lyricData);
-      console.log(`[Player] Parsed lyric result for ${id}`);
-
-      // 将解析后的歌词转换为标准LRC格式
-      const formattedLrc = formatToLrc(parsedResult);
-      console.log(`[Player] Formatted LRC for ${id}`);
-
-      // 添加格式化后的LRC到结果中
-      parsedResult.formattedLrc = formattedLrc;
-
-      music.setPlaySongLyric(parsedResult);
-    })
-    .catch((err) => {
-      console.error(`[Player] Failed to get unified lyric for ${id}:`, err);
-      const defaultResult = parseLyric(null);
-      defaultResult.formattedLrc = ""; // 确保默认结果也有formattedLrc字段
-      music.setPlaySongLyric(defaultResult);
-    });
+const fetchAndParseLyric = async (id) => {
+  try {
+    const { result, stale } = await lyricFetcher.fetchLyric(id);
+    if (stale) {
+      console.log(`[Player] Lyric fetch for ${id} is stale, discarding`);
+      return;
+    }
+    music.setPlaySongLyric(result);
+  } catch (err) {
+    console.error(`[Player] Failed to fetch lyric for ${id}:`, err);
+    const defaultResult = parseLyric(null);
+    defaultResult.formattedLrc = "";
+    music.setPlaySongLyric(defaultResult);
+  }
 };
 </script>
 

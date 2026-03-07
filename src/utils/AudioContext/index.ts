@@ -56,6 +56,10 @@ export { WasmFFTManager } from "./WasmFFTManager";
 // AudioPreloader
 export { AudioPreloader, getAudioPreloader } from "./AudioPreloader";
 
+// Unified song URL resolution
+export { resolveSongUrl } from "./resolveSongUrl";
+export type { SongUrlInput, ResolveSongUrlResult, ResolveSongUrlOptions } from "./resolveSongUrl";
+
 // AutoMix exports (backward-compatible aliases)
 export { CrossfadeScheduler as CrossfadeManager } from "./AutoMix";
 export { AutoMixEngine, getAutoMixEngine } from "./AutoMix";
