@@ -166,6 +166,7 @@ watch(
 </script>
 
 <style lang="scss" scoped>
+@import "@applemusic-like-lyrics/core/style.css";
 .lyric-player-wrapper {
   width: 100%;
   height: 100%;
