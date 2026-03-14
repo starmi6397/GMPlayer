@@ -155,7 +155,7 @@ jobs:
           pnpm build
 
       - name: 构建 Player 程序并发布自动构建
-        uses: tauri-apps/tauri-action@v1
+        uses: tauri-apps/tauri-action@lastest
         with:
           projectPath: packages/player
           tagName: ${{ github.ref_name }}-player-dev
