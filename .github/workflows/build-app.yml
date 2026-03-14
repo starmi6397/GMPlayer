@@ -1,0 +1,254 @@
+name: 构建 Player Tauri 桌面版本
+on:
+  push:
+    branches:
+      - master
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean-pre-release:
+    name: 删除预发布版本的构建产物
+    runs-on: ubuntu-latest
+    steps:
+      - name: 删除预发布版本的构建产物
+        uses: mknejp/delete-release-assets@v1
+        with:
+          token: ${{ github.token }}
+          assets: |
+            *.*
+          tag: ${{ github.ref_name }}-player-dev
+          fail-if-no-assets: false
+          fail-if-no-release: false
+
+  build-tauri-desktop:
+    name: 构建 Tauri 桌面版本
+    needs: clean-pre-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            args: ""
+            name: linux
+            arch: x86_64
+            artifact_name_suffix: linux-x64
+            package_extension: tar.gz
+            os_runner: ubuntu-latest
+          - platform: windows-latest
+            args: ""
+            name: windows
+            arch: x86_64
+            artifact_name_suffix: windows-x64
+            package_extension: zip
+            os_runner: windows-latest
+          - platform: windows-latest
+            args: "--target aarch64-pc-windows-msvc"
+            name: windows
+            arch: aarch64
+            artifact_name_suffix: windows-arm64
+            package_extension: zip
+            os_runner: windows-latest
+          - platform: macos-latest # arm64 二进制包
+            args: "--target aarch64-apple-darwin"
+            name: macOS
+            arch: aarch64
+            artifact_name_suffix: macos-arm64
+            package_extension: tar.gz
+            os_runner: macos-14
+          - platform: macos-latest # x86 二进制包
+            args: "--target x86_64-apple-darwin"
+            name: macOS
+            arch: x86_64
+            artifact_name_suffix: macos-x64
+            package_extension: tar.gz
+            os_runner: macos-latest
+          # - platform: macos-latest # 通用二进制包
+          #   args: "--target universal-apple-darwin"
+          #   name: macOS
+          #   arch: universal
+
+    runs-on: ${{ matrix.os_runner }}
+    env:
+      BUILDER_REPO: apoint123/ffmpeg-builder
+      FFMPEG_VERSION_TAG: "7.1"
+
+    steps:
+      - uses: actions/checkout@v4
+        name: 克隆仓库
+        with:
+          fetch-depth: 0 # 为了正确生成开发版本号码
+
+      - name: 安装 PNPM
+        uses: pnpm/action-setup@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: |
+            wasm32-unknown-unknown,${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || (matrix.platform == 'windows-latest' && matrix.arch == 'aarch64') && 'aarch64-pc-windows-msvc' || '' }}
+
+      - name: 安装系统依赖 (仅 Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libappindicator3-dev \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            curl \
+            unzip \
+            tar
+
+      - name: 配置 Rust 缓存
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            packages/player/src-tauri -> target
+          key: ${{ matrix.artifact_name_suffix }}
+
+      # macOS 自带的 Xcode LLVM 不支持 WASM 目标
+      - name: "macOS: 安装 LLVM 和 Clang"
+        uses: KyleMayes/install-llvm-action@v2
+        if: matrix.platform == 'macos-latest'
+        with:
+          version: "20"
+
+      - name: "macOS: 设置环境变量"
+        if: matrix.platform == 'macos-latest'
+        run: |
+          SDK_PATH=$(xcrun --show-sdk-path)
+          echo "SDK Path: $SDK_PATH"
+          echo "BINDGEN_EXTRA_CLANG_ARGS=-isysroot $SDK_PATH" >> $GITHUB_ENV
+        shell: bash
+
+      - name: 安装 wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: "v0.13.1"
+
+      - name: 预购建前端产物作为缓存
+        run: |
+          pnpm install:with-deps
+          pnpm build
+
+      - name: 构建 Player 程序并发布自动构建
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: packages/player
+          tagName: ${{ github.ref_name }}-player-dev
+          includeUpdaterJson: true
+          releaseName: Player ${{ github.ref_name }} branch development build
+          releaseBody: |
+            Latest ${{ github.ref_name }} branch development build.
+            最新 ${{ github.ref_name }} 分支开发调试构建。
+            Development version may be unstable and may not work properly, please only for test purpose.
+            开发版本可能不稳定且可能无法正常工作，请仅用于测试目的。
+
+            Latest commits (最新提交): ${{ github.event.head_commit.message }}
+          prerelease: true
+          args: ${{ matrix.args }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: 上传产物到 Action Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GMPlayer ${{matrix.name}}-${{matrix.arch}}
+          path: |
+            /src-tauri/target/**/release/bundle/**/*
+            /src-tauri/target/**/release/GMPlayer.exe
+            /src-tauri/target/**/release/GMPlayer
+  build-tauri-android:
+    name: 构建 Tauri 安卓移动版本
+    needs: clean-pre-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        name: 克隆仓库
+        with:
+          fetch-depth: 0 # 为了正确生成开发版本号码
+
+      - name: 安装 PNPM
+        uses: pnpm/action-setup@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          targets: "x86_64-unknown-linux-gnu,x86_64-linux-android,i686-linux-android,aarch64-linux-android,arm-linux-androideabi,armv7-linux-androideabi,thumbv7neon-linux-androideabi"
+
+      - name: 安装 wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: "v0.13.1"
+
+      - name: 安装 wasm32 目标
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: 配置 Rust 缓存
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            packages/player/src-tauri -> target
+          key: android
+
+      - name: 设置 Android SDK/NDK
+        uses: android-actions/setup-android@v3
+
+      - name: 安装 NDK
+        run: sdkmanager --install "ndk;27.2.12479018"
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+      - name: 预购建前端产物作为缓存
+        run: |
+          pnpm install:with-deps
+          pnpm build
+
+      - name: 生成开发构建版本号
+        run: |
+          node ./packages/player/scripts/gen-dev-version.mjs
+
+      - name: 构建 AMLL Player 安卓移动版程序
+        env:
+          CARGO_NDK_ANDROID_PLATFORM: 26
+        run: |
+          export NDK_HOME=$ANDROID_NDK_HOME
+          export JAVA_HOME=$JAVA_HOME_17_X64
+          pnpm tauri android build --split-per-abi
+
+      - name: 上传产物到 Action Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GMPlayer Android Universal
+          path: |
+            /src-tauri/gen/android/app/build/outputs/**/*.apk
+            /src-tauri/gen/android/app/build/outputs/**/*.aab
