@@ -58,11 +58,17 @@ const changeTheme = () => {
     themeColorMeta.setAttribute("content", "#ffffff");
     setCssVariable("--message-bg", "rgba(255, 255, 255, 0.72)");
     setCssVariable("--message-border", "rgba(0, 0, 0, 0.06)");
+    setCssVariable("--acrylic-bg", "rgba(255, 255, 255, 0.45)");
+    setCssVariable("--acrylic-border", "rgba(0, 0, 0, 0.04)");
+    setCssVariable("--layout-bg", "#fff");
   } else if (setting.getSiteTheme == "dark") {
     theme.value = darkTheme;
     themeColorMeta.setAttribute("content", "#18181c");
     setCssVariable("--message-bg", "rgba(48, 48, 51, 0.72)");
     setCssVariable("--message-border", "rgba(255, 255, 255, 0.08)");
+    setCssVariable("--acrylic-bg", "rgba(24, 24, 28, 0.45)");
+    setCssVariable("--acrylic-border", "rgba(255, 255, 255, 0.04)");
+    setCssVariable("--layout-bg", "#18181c");
   }
 };
 

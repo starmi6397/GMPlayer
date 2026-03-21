@@ -9,13 +9,14 @@
 html,
 body,
 #app {
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: subpixel-antialiased;
+  font-smooth: subpixel-antialiased;
   font-family: "HarmonyOS_Regular", sans-serif !important;
 }
 
 // Dialog
 .s-dialog {
-  border-radius: 8px;
+  border-radius: 12px;
   .n-dialog__close {
     margin: 16px 26px 0 0;
   }
@@ -37,7 +38,7 @@ body,
   width: 60vw;
   max-width: 700px;
   min-width: min(24rem, 100vw);
-  border-radius: 8px;
+  border-radius: 12px;
   &.close {
     .n-card-header {
       .n-base-close {
@@ -78,7 +79,7 @@ body,
 
 // Dropdown
 .n-dropdown-menu {
-  border-radius: 8px !important;
+  border-radius: 12px !important;
 }
 
 // Tab
@@ -97,7 +98,7 @@ body,
     margin-bottom: 8px;
   }
   .n-message {
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 10px 14px;
     font-size: 13px;
     background: var(--message-bg, rgba(255, 255, 255, 0.72)) !important;
@@ -125,7 +126,7 @@ body,
 
 // Notification
 .n-notification {
-  border-radius: 8px !important;
+  border-radius: 12px !important;
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.12),
     0 2px 8px rgba(0, 0, 0, 0.08);
@@ -133,13 +134,13 @@ body,
 
 // Nalert
 .n-alert {
-  border-radius: 8px !important;
+  border-radius: 12px !important;
 }
 
 // Drawer
 .n-drawer-container {
   .n-drawer {
-    border-radius: 8px 0 0 8px;
+    border-radius: 12px 0 0 12px;
     transition: all 0.3s;
     @media (max-width: 450px) {
       width: 100% !important;
@@ -174,7 +175,7 @@ body,
 }
 
 // 响应式布局
-@mixin changeWidth($padding: 10vw) {
+@mixin changeWidth($padding: 28px) {
   .n-layout-header {
     padding: 0 $padding;
   }
@@ -191,7 +192,7 @@ body,
 
 @include changeWidth;
 
-/* 小于1200px时 */
-@media (max-width: 1200px) {
-  @include changeWidth($padding: 5vw);
+/* 小于768px时 (移动端 - 无侧边栏) */
+@media (max-width: 768px) {
+  @include changeWidth($padding: 4vw);
 }

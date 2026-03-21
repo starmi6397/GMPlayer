@@ -81,7 +81,7 @@
     "typescript": "^5.9.3",
     "unplugin-auto-import": "^19.3.0",
     "unplugin-vue-components": "^28.8.0",
-    "vite": "npm:rolldown-vite@^7.3.1",
+    "vite": "^8.0.1",
     "vite-plugin-compression2": "^2.4.0",
     "vite-plugin-optimize-persist": "^0.1.2",
     "vite-plugin-package-config": "^0.1.1",
@@ -93,9 +93,6 @@
   },
   "packageManager": "pnpm@10.28.2",
   "pnpm": {
-    "overrides": {
-      "vite": "npm:rolldown-vite@latest"
-    },
     "onlyBuiltDependencies": [
       "esbuild",
       "@applemusic-like-lyrics/lyric"

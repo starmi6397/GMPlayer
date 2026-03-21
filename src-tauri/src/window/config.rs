@@ -128,7 +128,7 @@ impl WindowConfig {
             closeable_to_tray: true,
             use_overlay_titlebar: true,
             traffic_lights_inset: Some((12.0, 16.0)),
-            window_effect: None,
+            window_effect: Some("acrylic".into()),
             shadow: true,
             additional_args: Some(DEFAULT_ADDTIONAL_WINDOW_ARGS.to_owned()),
             parent_label: None,

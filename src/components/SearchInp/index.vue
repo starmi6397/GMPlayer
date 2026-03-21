@@ -342,19 +342,17 @@ watch(
   position: relative;
   width: 100%;
   display: flex;
-  justify-content: flex-end;
-  // 允许拖动穿透空白区域
+  justify-content: flex-start;
   pointer-events: none;
   .input {
-    // 输入框本身保持可交互
     pointer-events: auto;
-    width: 200px;
+    width: 100%;
     transition: all 0.3s;
     @media (max-width: 450px) {
       width: 40px;
     }
     &.focus {
-      width: 280px;
+      width: 100%;
       :deep(input) {
         color: var(--main-color);
       }
@@ -380,16 +378,16 @@ watch(
   .list {
     position: absolute;
     top: 40px;
-    right: 0;
-    border-radius: 8px;
-    width: 280px;
+    left: 0;
+    border-radius: 12px;
+    width: 300px;
     z-index: 3;
-    pointer-events: auto; // 恢复点击事件，防止被父元素的 pointer-events: none 影响
+    pointer-events: auto;
 
     @media (max-width: 450px) {
       position: fixed;
       width: 100%;
-      top: 58px;
+      top: 64px;
       right: 0;
       left: 0;
       border-radius: 0 0 8px 8px;
@@ -469,7 +467,7 @@ watch(
               align-items: center;
               margin-bottom: 8px;
               cursor: pointer;
-              border-radius: 8px;
+              border-radius: 10px;
               padding: 6px;
               transition: all 0.3s;
 
@@ -564,7 +562,7 @@ watch(
                 padding: 14px 18px 14px 22px;
                 cursor: pointer;
                 transition: all 0.3s;
-                border-radius: 8px;
+                border-radius: 10px;
                 &:hover {
                   background-color: var(--n-border-color);
                 }
