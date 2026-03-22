@@ -222,6 +222,7 @@ const useListenTogetherStore = defineStore("listenTogether", {
           await listenTogether.checkRoom(roomId);
 
           await this.fetchRoomPlaylist();
+          this.startHeartbeat();
           this.startPolling();
 
           $message.success("listenTogether.joinSuccess");
@@ -267,13 +268,13 @@ const useListenTogetherStore = defineStore("listenTogether", {
     },
 
     /**
-     * 发送播放命令（房主）
+     * 发送播放命令（房主或房客均可）
      */
     async sendPlayCommand(
       commandType: "PLAY" | "PAUSE" | "GOTO" | "seek",
       progress?: number,
     ): Promise<boolean> {
-      if (!this.isHost || !this.roomInfo) return false;
+      if (!this.isInRoom || !this.roomInfo) return false;
 
       const musicStore = useMusicDataStore();
       const currentSong = musicStore.getPlaySongData;
@@ -415,7 +416,8 @@ const useListenTogetherStore = defineStore("listenTogether", {
             ? allUsers.filter((u) => u.userId !== this.roomInfo!.creatorId)
             : allUsers;
 
-          if (this.isGuest && res.data.currentSongId) {
+          // 房主和房客都处理远程同步（双向切歌同步）
+          if (this.isInRoom && res.data.currentSongId) {
             await this.handleRemoteSync(res.data);
           }
         }
@@ -426,7 +428,8 @@ const useListenTogetherStore = defineStore("listenTogether", {
     },
 
     /**
-     * 处理远程同步（房客）
+     * 处理远程同步（房主和房客均可）
+     * 当服务端报告的 currentSongId 与本地不同时，切换到对应歌曲
      */
     async handleRemoteSync(data: RoomStatus): Promise<void> {
       if (this.isProcessingRemoteCommand) return;
@@ -438,12 +441,49 @@ const useListenTogetherStore = defineStore("listenTogether", {
         if (data.currentSongId && data.currentSongId !== this.lastSyncedSongId) {
           const currentSong = musicStore.getPlaySongData;
           if (!currentSong || currentSong.id !== data.currentSongId) {
-            const playlist = musicStore.getPlaylists;
-            const index = playlist.findIndex((s) => s.id === data.currentSongId);
+            let playlist = musicStore.getPlaylists;
+            let index = playlist.findIndex((s) => s.id === data.currentSongId);
+
+            // 歌曲不在本地播放列表中，重新获取房间播放列表
+            if (index === -1) {
+              await this.fetchRoomPlaylist();
+              playlist = musicStore.getPlaylists;
+              index = playlist.findIndex((s) => s.id === data.currentSongId);
+            }
+
+            // 仍然找不到，单独获取歌曲详情并添加到播放列表
+            if (index === -1) {
+              try {
+                const detailRes = await getMusicDetail([data.currentSongId]);
+                if (detailRes.songs?.length) {
+                  const song = detailRes.songs[0];
+                  const newSong = {
+                    id: song.id,
+                    name: song.name,
+                    artist: song.ar,
+                    album: song.al,
+                    alia: song.alia,
+                    time: formatSongTime(song.dt),
+                    fee: song.fee,
+                    pc: song.pc || null,
+                    mv: song.mv || null,
+                  };
+                  musicStore.persistData.playlists.push(newSong);
+                  index = musicStore.persistData.playlists.length - 1;
+                }
+              } catch (e) {
+                console.error("Fetch song detail for sync failed:", e);
+              }
+            }
+
             if (index !== -1) {
               musicStore.persistData.playSongIndex = index;
-              this.lastSyncedSongId = data.currentSongId;
             }
+            // 无论是否找到，都更新 lastSyncedSongId 防止重复请求
+            this.lastSyncedSongId = data.currentSongId;
+          } else {
+            // 已经在播放正确的歌曲
+            this.lastSyncedSongId = data.currentSongId;
           }
         }
 
@@ -512,7 +552,7 @@ const useListenTogetherStore = defineStore("listenTogether", {
     },
 
     startHeartbeat(): void {
-      if (!this.isHost) return;
+      if (!this.isInRoom) return;
       this.stopHeartbeat();
       // 立即发送一次心跳，让服务端尽快切换到 CONNECTED
       this.sendHeartbeat();
