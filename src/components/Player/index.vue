@@ -422,8 +422,8 @@ const songTimeSliderUpdate = (val) => {
   if (player.value && music.getPlaySongTime?.duration) {
     const currentTime = (music.getPlaySongTime.duration / 100) * val;
     setSeek(player.value, currentTime);
-    // 一起听歌：房主发送进度跳转命令
-    if (listenTogether.isHost) {
+    // 一起听歌：发送进度跳转命令（房主和房客均可）
+    if (listenTogether.isInRoom) {
       listenTogether.sendPlayCommand("seek", Math.floor(currentTime * 1000));
     }
   }
@@ -821,11 +821,13 @@ watch(
       songChange(val);
       broadcastPlayerState();
 
-      // 一起听歌：房主发送切歌命令
-      if (listenTogether.isHost && val?.id && !listenTogether.isProcessingRemoteCommand) {
+      // 一起听歌：发送切歌命令（房主和房客均可）
+      if (listenTogether.isInRoom && val?.id && !listenTogether.isProcessingRemoteCommand) {
         listenTogether.sendPlayCommand("GOTO");
-        // 同步播放列表
-        listenTogether.syncCurrentPlaylist();
+        // 仅房主同步播放列表
+        if (listenTogether.isHost) {
+          listenTogether.syncCurrentPlaylist();
+        }
       }
 
       // Update tray tooltip with current song info
@@ -871,8 +873,8 @@ watch(
         lyricIndex: music.playSongLyricIndex,
       });
     }
-    // 一起听歌：房主发送播放状态同步
-    if (listenTogether.isHost && !listenTogether.isProcessingRemoteCommand) {
+    // 一起听歌：发送播放状态同步（房主和房客均可）
+    if (listenTogether.isInRoom && !listenTogether.isProcessingRemoteCommand) {
       listenTogether.sendPlayCommand(val ? "PLAY" : "PAUSE");
     }
     nextTick().then(() => {
