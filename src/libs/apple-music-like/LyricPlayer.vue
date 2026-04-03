@@ -9,6 +9,7 @@
       :enable-spring="copyValue('showYrcAnimation')"
       :enable-scale="copyValue('showYrcAnimation')"
       :word-fade-width="0.5"
+      :mask-obscene-words-mode="MaskObsceneWordsMode.Disabled"
       :align-anchor="alignAnchor"
       :align-position="alignPosition"
       :line-pos-x-spring-params="copyValue('springParams.posX')"
@@ -27,6 +28,7 @@
 import { ref, computed, watch, watchEffect, toRaw, shallowRef, onMounted, nextTick } from "vue";
 import { musicStore, settingStore, siteStore } from "../../store";
 import { LyricPlayer, LyricPlayerRef } from "@applemusic-like-lyrics/vue";
+import { MaskObsceneWordsMode } from "@applemusic-like-lyrics/core";
 import { preprocessLyrics, getProcessedLyrics, type AMLLLine } from "@/utils/LyricsProcessor";
 import "@applemusic-like-lyrics/core/style.css";
 
