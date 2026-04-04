@@ -1,4 +1,4 @@
-use crate::window::config::WindowConfig;
+use crate::desktop::window::config::WindowConfig;
 use log::info;
 use tauri::window::EffectsBuilder;
 #[cfg(target_os = "windows")]
@@ -69,7 +69,10 @@ pub fn create_window(app: &AppHandle, config: &WindowConfig) -> Result<(), Strin
         if let Some(parent_window) = app.get_webview_window(parent_label) {
             builder = builder.parent(&parent_window).map_err(|e| e.to_string())?;
         } else {
-            return Err(format!("Parent window '{}' not found for '{}'", parent_label, label));
+            return Err(format!(
+                "Parent window '{}' not found for '{}'",
+                parent_label, label
+            ));
         }
     }
 
