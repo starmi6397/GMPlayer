@@ -166,6 +166,10 @@ jobs:
             /src-tauri/target/**/release/bundle/**/*
             /src-tauri/target/**/release/GMPlayer.exe
             /src-tauri/target/**/release/GMPlayer
+            /src-tauri/target/**/release/app
+            /src-tauri/target/**/release/app.exe
+            /src-tauri/target/**/release/gmplayer.exe
+            /src-tauri/target/**/release/gmplayer
   build-tauri-android:
     name: 构建 Tauri 安卓移动版本
     needs: clean-pre-release
@@ -226,7 +230,11 @@ jobs:
           pnpm install:with-deps
           pnpm build
 
-      - name: 构建 AMLL Player 安卓移动版程序
+      - name: 全局安装 Tauri CLI
+        run: |
+          pnpm add -g @tauri-apps/cli@latest
+
+      - name: 构建 Player 安卓移动版程序
         env:
           CARGO_NDK_ANDROID_PLATFORM: 26
         run: |
