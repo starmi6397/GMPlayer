@@ -91,7 +91,7 @@
     "vite-svg-loader": "^5.1.1",
     "vue-tsc": "^2.2.12"
   },
-  "packageManager": "pnpm@10.28.2",
+  "packageManager": "pnpm@10.33.0",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",

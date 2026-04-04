@@ -130,6 +130,5 @@ declare module 'vue' {
     Spectrum: typeof import('./src/components/Player/Spectrum.vue')['default']
     TitleBar: typeof import('./src/components/TitleBar/index.vue')['default']
     VideoLists: typeof import('./src/components/DataList/VideoLists.vue')['default']
-    WindowChromeControls: typeof import('./src/components/WindowChromeControls.vue')['default']
   }
 }

@@ -1,13 +1,13 @@
 <template>
-  <nav :class="{ 'tauri-app': isTauri }" :data-tauri-drag-region="isTauri || undefined">
-    <div class="left" :data-tauri-drag-region="isTauri || undefined">
+  <nav :class="{ 'tauri-app': (isTauri && !isMobile) }" :data-tauri-drag-region="isTauri || undefined">
+    <div class="left" :data-tauri-drag-region="(isTauri && !isMobile) || undefined">
       <div class="controls">
         <n-icon size="22" :component="Left" @click="router.go(-1)" />
         <n-icon size="22" :component="Right" @click="router.go(1)" />
       </div>
       <span v-if="routeTitle" class="route-title">{{ routeTitle }}</span>
     </div>
-    <div class="right" :data-tauri-drag-region="isTauri || undefined">
+    <div class="right" :data-tauri-drag-region="(isTauri && !isMobile) || undefined">
       <SearchInp />
       <!-- Theme toggle -->
       <n-icon
@@ -28,6 +28,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import AboutSite from "@/components/DataModal/AboutSite.vue";
 import SearchInp from "@/components/SearchInp/index.vue";
+import { isTauri, isMobile } from "@/utils/tauri";
 
 const router = useRouter();
 const route = useRoute();
@@ -78,11 +79,6 @@ const routeTitle = computed(() => {
 });
 
 // Tauri detection
-const isTauri = ref(false);
-onMounted(() => {
-  isTauri.value = typeof window !== "undefined" && "__TAURI__" in window;
-});
-
 const toggleTheme = () => {
   if (setting.getSiteTheme === "light") {
     setting.setSiteTheme("dark");
