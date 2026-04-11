@@ -17,7 +17,7 @@
     "fmt:check": "oxfmt --check src/"
   },
   "dependencies": {
-    "@applemusic-like-lyrics/core": "^0.3.1",
+    "@applemusic-like-lyrics/core": "link:deps\\apoint-amll\\packages\\core",
     "@applemusic-like-lyrics/fft": "link:deps\\apoint-amll\\packages\\fft",
     "@applemusic-like-lyrics/lyric": "link:deps\\apoint-amll\\packages\\lyric",
     "@applemusic-like-lyrics/vue": "link:deps\\apoint-amll\\packages\\vue",
