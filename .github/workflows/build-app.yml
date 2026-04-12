@@ -163,14 +163,14 @@ jobs:
         with:
           name: GMPlayer ${{matrix.name}}-${{matrix.arch}}
           path: |
-            \src-tauri\target\**\release\bundle\**\*.exe
-            \src-tauri\target\**\release\bundle\**\*.msi
-            \src-tauri\target\**\release\GMPlayer.exe
-            \src-tauri\target\**\release\GMPlayer
-            \src-tauri\target\**\release\app
-            \src-tauri\target\**\release\app.exe
-            \src-tauri\target\**\release\gmplayer.exe
-            \src-tauri\target\**\release\gmplayer
+            src-tauri/target/**/release/bundle/**/*.exe
+            src-tauri/target/**/release/bundle/**/*.msi
+            src-tauri/target/**/release/GMPlayer.exe
+            src-tauri/target/**/release/GMPlayer
+            src-tauri/target/**/release/app
+            src-tauri/target/**/release/app.exe
+            src-tauri/target/**/release/gmplayer.exe
+            src-tauri/target/**/release/gmplayer
   build-tauri-android:
     name: 构建 Tauri 安卓移动版本
     needs: clean-pre-release
@@ -248,5 +248,5 @@ jobs:
         with:
           name: GMPlayer Android Universal
           path: |
-            /src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk
-            /src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
+            src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk
+            src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
