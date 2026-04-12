@@ -171,15 +171,15 @@ const useListenTogetherStore = defineStore("listenTogether", {
           this.startHeartbeat();
           this.startPolling();
 
-          $message.success("一起听房间创建成功");
+          $message.success(getLanguageData("ltCreateSuccess"));
           return true;
         } else {
-          $message.error(res.message || "listenTogether.createFailed");
+          $message.error(res.message || getLanguageData("ltCreateFailed"));
           return false;
         }
       } catch (error) {
         console.error("Create room failed:", error);
-        $message.error("listenTogether.createFailed");
+        $message.error(getLanguageData("ltCreateFailed"));
         return false;
       }
     },
@@ -225,15 +225,15 @@ const useListenTogetherStore = defineStore("listenTogether", {
           this.startHeartbeat();
           this.startPolling();
 
-          $message.success("listenTogether.joinSuccess");
+          $message.success(getLanguageData("ltJoinSuccess"));
           return true;
         } else {
-          $message.error(res.message || "listenTogether.joinFailed");
+          $message.error(res.message || getLanguageData("ltJoinFailed"));
           return false;
         }
       } catch (error) {
         console.error("Join room failed:", error);
-        $message.error("listenTogether.joinFailed");
+        $message.error(getLanguageData("ltJoinFailed"));
         return false;
       }
     },
@@ -258,7 +258,9 @@ const useListenTogetherStore = defineStore("listenTogether", {
         }
 
         $message.success(
-          this.role === "host" ? "listenTogether.closeSuccess" : "listenTogether.leaveSuccess",
+          this.role === "host"
+            ? getLanguageData("ltCloseSuccess")
+            : getLanguageData("ltLeaveSuccess"),
         );
       } catch (error) {
         console.error("Leave room error:", error);
@@ -405,7 +407,7 @@ const useListenTogetherStore = defineStore("listenTogether", {
         const res = await listenTogether.getRoomStatus();
         if (res.code === 200 && res.data) {
           if (!res.data.inRoom) {
-            $message.warning("listenTogether.roomClosed");
+            $message.warning(getLanguageData("ltRoomClosed"));
             this.resetState();
             return;
           }

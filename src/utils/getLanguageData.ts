@@ -38,6 +38,13 @@ interface LanguageTexts {
   songPlayError?: string;
   songLoadTest?: string;
   songNotDetails: string;
+  ltCreateSuccess: string;
+  ltCreateFailed: string;
+  ltJoinSuccess: string;
+  ltJoinFailed: string;
+  ltCloseSuccess: string;
+  ltLeaveSuccess: string;
+  ltRoomClosed: string;
 }
 
 // 定义语言数据类型
@@ -83,6 +90,13 @@ const languageData: LanguageData = {
     songPlayError: "歌曲播放失败",
     songLoadTest: "歌曲重试次数过多，请刷新后重试",
     songNotDetails: "歌曲详细信息获取失败，可尝试歌曲匹配",
+    ltCreateSuccess: "一起听房间创建成功",
+    ltCreateFailed: "创建房间失败，请重试",
+    ltJoinSuccess: "加入房间成功",
+    ltJoinFailed: "加入房间失败，请检查房间号",
+    ltCloseSuccess: "房间已结束",
+    ltLeaveSuccess: "已离开房间",
+    ltRoomClosed: "房间已关闭或不存在",
   },
   en: {
     million: "M",
@@ -115,6 +129,13 @@ const languageData: LanguageData = {
     noSong: "No song was found",
     removeSong: "has been removed from the playlist",
     songNotDetails: "Song details failed to get, try song match",
+    ltCreateSuccess: "Room created successfully",
+    ltCreateFailed: "Failed to create room, please try again",
+    ltJoinSuccess: "Joined room successfully",
+    ltJoinFailed: "Failed to join room, please check the room ID",
+    ltCloseSuccess: "Room has been closed",
+    ltLeaveSuccess: "You have left the room",
+    ltRoomClosed: "Room is closed or does not exist",
   },
 };
 
@@ -123,14 +144,14 @@ const languageData: LanguageData = {
  * @param type 文本类别
  * @returns 对应语种文本
  */
-const getLanguageData = (type: keyof LanguageTexts): string | null => {
+const getLanguageData = (type: keyof LanguageTexts): string => {
   try {
     const setting = settingStore();
     const language = setting.language as LanguageType;
-    return languageData[language][type];
+    return languageData[language][type] ?? "";
   } catch (err) {
     console.log("Failed to get translated:" + err);
-    return null;
+    return "";
   }
 };
 

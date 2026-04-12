@@ -304,6 +304,24 @@ export default {
       copyFailed: "Failed to copy",
       syncError: "Sync error, retrying...",
       waitingForHost: "Waiting for host to play...",
+      me: "You",
+      titleHost: "Listen Together · Host",
+      titleGuest: "Listen Together · Guest",
+      noSong: "Please play a song first",
+      createHint: "Invite friends to listen together",
+      synced: "In sync",
+      syncing: "Syncing",
+      playing: "Playing",
+    },
+  },
+  // Player
+  player: {
+    loading: {
+      resolving: "Fetching audio",
+      buffering: "Buffering",
+      stalled: "Network issue",
+      error: "Load failed",
+      loading: "Loading",
     },
   },
   // Close behavior dialog

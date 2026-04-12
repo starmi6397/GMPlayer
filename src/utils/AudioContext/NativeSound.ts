@@ -226,12 +226,14 @@ export class NativeSound implements ISound {
       stalled: () => {
         if (this._unloading) return;
         console.warn("NativeSound: stalled - network issue");
+        this._emit("stalled");
       },
       waiting: () => {
         if (this._unloading) return;
         if (IS_DEV) {
           console.log("NativeSound: waiting for data");
         }
+        this._emit("waiting");
       },
       error: () => {
         if (this._unloading) return;

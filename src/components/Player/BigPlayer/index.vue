@@ -319,7 +319,10 @@ watch(
     min-height: 0;
     min-width: 0;
     justify-content: stretch;
-    grid-template-rows: [thumb] calc(env(safe-area-inset-top, 0px) + 30px) [main-view] 1fr;
+    // --app-safe-area-top is env(safe-area-inset-top) on Tauri mobile, 0px everywhere else.
+    // Using the CSS var keeps this in sync with useMobileSafeAreaVars and avoids
+    // the html.is-mobile-device class hack.
+    grid-template-rows: [thumb] calc(var(--app-safe-area-top, 0px) + 30px) [main-view] 1fr;
     grid-template-columns: 1fr;
 
     // ═══ 状态切换 (AMLL .hideLyric 模式反转) ═══

@@ -304,6 +304,24 @@ export default {
       copyFailed: "复制失败",
       syncError: "同步失败，正在重试...",
       waitingForHost: "等待房主播放歌曲...",
+      me: "你",
+      titleHost: "一起听歌 · 房主",
+      titleGuest: "一起听歌 · 房客",
+      noSong: "请先播放一首歌曲",
+      createHint: "邀请好友加入，一起听歌",
+      synced: "已同步",
+      syncing: "同步中",
+      playing: "播放中",
+    },
+  },
+  // 播放器
+  player: {
+    loading: {
+      resolving: "获取音频资源中",
+      buffering: "缓冲中",
+      stalled: "网络异常",
+      error: "加载失败",
+      loading: "加载中",
     },
   },
   // 关闭行为对话框

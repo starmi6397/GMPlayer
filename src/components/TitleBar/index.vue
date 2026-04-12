@@ -69,7 +69,8 @@ async function checkMaximized() {
 }
 
 onMounted(async () => {
-  if (!(isTauri() || isMobile())) return;
+  if (!isTauri()) return;
+  if (await isMobile()) return;
 
   // Don't show custom titlebar on macOS (traffic lights handle it)
   const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;

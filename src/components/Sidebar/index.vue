@@ -72,7 +72,10 @@
       </div>
 
       <!-- Library section (login required) -->
-      <div v-if="user.userLogin" :class="['sidebar-section', { collapsed: setting.sidebarCollapsed }]">
+      <div
+        v-if="user.userLogin"
+        :class="['sidebar-section', { collapsed: setting.sidebarCollapsed }]"
+      >
         <AnimatePresence>
           <Motion
             v-if="!setting.sidebarCollapsed"
@@ -112,7 +115,10 @@
       </div>
 
       <!-- My Playlists section (login required) -->
-      <div v-if="user.userLogin" :class="['sidebar-section', { collapsed: setting.sidebarCollapsed }]">
+      <div
+        v-if="user.userLogin"
+        :class="['sidebar-section', { collapsed: setting.sidebarCollapsed }]"
+      >
         <AnimatePresence>
           <Motion
             v-if="!setting.sidebarCollapsed"
@@ -148,7 +154,11 @@
         </template>
         <AnimatePresence>
           <Motion
-            v-if="!setting.sidebarCollapsed && !user.getUserPlayLists.isLoading && !user.getUserPlayLists.own.length"
+            v-if="
+              !setting.sidebarCollapsed &&
+              !user.getUserPlayLists.isLoading &&
+              !user.getUserPlayLists.own.length
+            "
             class="sidebar-empty"
             :initial="{ opacity: 0 }"
             :animate="{ opacity: 1 }"
@@ -220,8 +230,8 @@
               fallback-src="/images/ico/user-filling.svg"
             />
             <span :class="['sidebar-user-name text-hidden', { hidden: setting.sidebarCollapsed }]">
-                {{ user.userLogin ? user.getUserData.nickname : $t("nav.avatar.notLogin") }}
-              </span>
+              {{ user.userLogin ? user.getUserData.nickname : $t("nav.avatar.notLogin") }}
+            </span>
           </div>
         </template>
         {{ user.userLogin ? user.getUserData.nickname : $t("nav.avatar.notLogin") }}
@@ -339,7 +349,9 @@ const goToPlaylist = (id) => {
   cursor: pointer;
   padding: 6px;
   border-radius: 6px;
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
   color: var(--sidebar-text);
 
   &:hover {
@@ -418,7 +430,10 @@ const goToPlaylist = (id) => {
   padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.2s, padding 0.3s ease, gap 0.3s ease;
+  transition:
+    background-color 0.2s,
+    padding 0.3s ease,
+    gap 0.3s ease;
   overflow: hidden;
   white-space: nowrap;
 
@@ -442,12 +457,16 @@ const goToPlaylist = (id) => {
   overflow: hidden;
   text-overflow: ellipsis;
   opacity: 1;
-  transition: opacity 0.2s ease 0.1s, flex 0.3s ease;
+  transition:
+    opacity 0.2s ease 0.1s,
+    flex 0.3s ease;
 
   &.hidden {
     flex: 0;
     opacity: 0;
-    transition: opacity 0.1s ease, flex 0.3s ease;
+    transition:
+      opacity 0.1s ease,
+      flex 0.3s ease;
   }
 }
 

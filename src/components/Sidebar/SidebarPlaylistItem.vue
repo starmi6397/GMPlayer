@@ -1,17 +1,18 @@
 <template>
   <n-tooltip placement="right" :disabled="!collapsed" :delay="300">
     <template #trigger>
-      <div
-        :class="['sidebar-playlist-item', { collapsed }]"
-        @click="$emit('navigate', id)"
-      >
+      <div :class="['sidebar-playlist-item', { collapsed }]" @click="$emit('navigate', id)">
         <img
           class="sidebar-playlist-cover"
-          :src="cover ? cover.replace(/^http:/, 'https:') + '?param=50y50' : '/images/pic/default.png'"
+          :src="
+            cover ? cover.replace(/^http:/, 'https:') + '?param=50y50' : '/images/pic/default.png'
+          "
           alt="cover"
           loading="lazy"
         />
-        <span :class="['sidebar-playlist-name text-hidden', { hidden: collapsed }]">{{ name }}</span>
+        <span :class="['sidebar-playlist-name text-hidden', { hidden: collapsed }]">{{
+          name
+        }}</span>
       </div>
     </template>
     {{ name }}
@@ -39,7 +40,10 @@ defineEmits(["navigate"]);
   padding: 7px 14px;
   border-radius: 10px;
   cursor: pointer;
-  transition: background-color 0.2s, padding 0.3s ease, gap 0.3s ease;
+  transition:
+    background-color 0.2s,
+    padding 0.3s ease,
+    gap 0.3s ease;
   overflow: hidden;
   white-space: nowrap;
 
@@ -80,12 +84,16 @@ defineEmits(["navigate"]);
   overflow: hidden;
   text-overflow: ellipsis;
   opacity: 1;
-  transition: opacity 0.2s ease 0.1s, flex 0.3s ease;
+  transition:
+    opacity 0.2s ease 0.1s,
+    flex 0.3s ease;
 
   &.hidden {
     flex: 0;
     opacity: 0;
-    transition: opacity 0.1s ease, flex 0.3s ease;
+    transition:
+      opacity 0.1s ease,
+      flex 0.3s ease;
   }
 }
 </style>

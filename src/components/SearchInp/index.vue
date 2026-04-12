@@ -377,7 +377,7 @@ watch(
   }
   .list {
     position: absolute;
-    top: 40px;
+    top: calc(var(--app-safe-area-top, 0px) + 40px);
     left: 0;
     border-radius: 12px;
     width: 300px;
@@ -387,7 +387,7 @@ watch(
     @media (max-width: 450px) {
       position: fixed;
       width: 100%;
-      top: 64px;
+      top: calc(var(--app-safe-area-top, 0px) + 64px);
       right: 0;
       left: 0;
       border-radius: 0 0 8px 8px;

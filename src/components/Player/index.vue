@@ -51,48 +51,60 @@
             <!-- 显示歌手或歌词 -->
             <div class="artisrOrLrc" v-if="music.getPlaySongData">
               <Transition name="fade" mode="out-in">
-                <template v-if="setting.bottomLyricShow">
-                  <Transition name="fade" mode="out-in">
+                <!-- Loading phase: show stage text instead of lyrics/artist -->
+                <span v-if="music.isLoadingSong" key="loading" class="loading-status">
+                  {{ loadingStageText }}
+                </span>
+                <!-- Lyric mode -->
+                <Transition
+                  v-else-if="setting.bottomLyricShow"
+                  key="lyric-mode"
+                  name="fade"
+                  mode="out-in"
+                >
+                  <n-text
+                    v-if="
+                      music.getPlaySongLyric?.lrc?.length &&
+                      setting.showYrc &&
+                      music.getPlaySongLyricIndex != -1 &&
+                      music.getPlaySongLyric.hasYrc
+                    "
+                    :key="'yrc-' + music.getPlaySongLyricIndex"
+                    class="lrc text-hidden"
+                  >
                     <n-text
-                      v-if="
-                        music.getPlaySongLyric?.lrc?.length &&
-                        setting.showYrc &&
-                        music.getPlaySongLyricIndex != -1 &&
-                        music.getPlaySongLyric.hasYrc
-                      "
-                      :key="'yrc-' + music.getPlaySongLyricIndex"
-                      class="lrc text-hidden"
-                    >
-                      <n-text
-                        v-for="item in music.getPlaySongLyric.yrc[music.getPlaySongLyricIndex]
-                          .content"
-                        :key="item"
-                        :depth="3"
-                      >
-                        {{ item.content }}
-                      </n-text>
-                    </n-text>
-                    <n-text
-                      v-else-if="
-                        music.getPlaySongLyric?.lrc?.length && music.getPlaySongLyricIndex != -1
-                      "
-                      :key="'lrc-' + music.getPlaySongLyricIndex"
-                      class="lrc text-hidden"
+                      v-for="item in music.getPlaySongLyric.yrc[music.getPlaySongLyricIndex]
+                        .content"
+                      :key="item"
                       :depth="3"
                     >
-                      {{ music.getPlaySongLyric.lrc[music.getPlaySongLyricIndex]?.content }}
+                      {{ item.content }}
                     </n-text>
-                    <AllArtists
-                      v-else
-                      key="artists"
-                      class="text-hidden"
-                      :artistsData="music.getPlaySongData.artist"
-                    />
-                  </Transition>
-                </template>
-                <template v-else>
-                  <AllArtists class="text-hidden" :artistsData="music.getPlaySongData.artist" />
-                </template>
+                  </n-text>
+                  <n-text
+                    v-else-if="
+                      music.getPlaySongLyric?.lrc?.length && music.getPlaySongLyricIndex != -1
+                    "
+                    :key="'lrc-' + music.getPlaySongLyricIndex"
+                    class="lrc text-hidden"
+                    :depth="3"
+                  >
+                    {{ music.getPlaySongLyric.lrc[music.getPlaySongLyricIndex]?.content }}
+                  </n-text>
+                  <AllArtists
+                    v-else
+                    key="artists"
+                    class="text-hidden"
+                    :artistsData="music.getPlaySongData.artist"
+                  />
+                </Transition>
+                <!-- Artist mode -->
+                <AllArtists
+                  v-else
+                  key="artist-mode"
+                  class="text-hidden"
+                  :artistsData="music.getPlaySongData.artist"
+                />
               </Transition>
             </div>
           </div>
@@ -304,6 +316,7 @@ import { debounce, throttle } from "throttle-debounce";
 import { useI18n } from "vue-i18n";
 import { isTauri } from "@/utils/tauri";
 import { windowManager } from "@/utils/tauri/windowManager";
+import { useAndroidMediaSession } from "@/composables/useAndroidMediaSession";
 import VueSlider from "vue-slider-component";
 import AddPlaylist from "@/components/DataModal/AddPlaylist.vue";
 import PlayListDrawer from "@/components/DataModal/PlayListDrawer.vue";
@@ -321,6 +334,11 @@ const { t } = useI18n();
 const router = useRouter();
 const setting = settingStore();
 const music = musicStore();
+
+// Android: media notification + lock-screen / hardware-key control bridge.
+// Self-contained: sets up its own watchers, lifecycle hooks, and event listener.
+// No-op on desktop and browser builds (checked internally via isTauri + isMobile).
+useAndroidMediaSession();
 const listenTogether = listenTogetherStore();
 const { persistData } = storeToRefs(music);
 const addPlayListRef = ref(null);
@@ -340,6 +358,9 @@ let _songLoadGeneration = 0;
 // 获取歌曲播放数据
 const getPlaySongData = async (data, level = setting.songLevel) => {
   const generation = ++_songLoadGeneration;
+  // Signal that we're in the URL-resolution phase so the UI can show a
+  // meaningful status rather than a generic spinner.
+  music.loadingStage = "resolving";
   try {
     if (!data || !data.id) {
       console.error("[Player] getPlaySongData called with invalid data:", data);
@@ -391,6 +412,8 @@ const getPlaySongData = async (data, level = setting.songLevel) => {
     // 获取歌词
     fetchAndParseLyric(id);
   } catch (err) {
+    music.isLoadingSong = false;
+    music.loadingStage = "idle";
     if (generation !== _songLoadGeneration) return;
     console.error("[Player] Error in getPlaySongData:", err);
     if (music.getPlaylists[0] && music.getPlayState) {
@@ -412,6 +435,16 @@ const renderIcon = (icon) => {
     );
   };
 };
+
+// Human-readable loading stage text shown in the bottom bar subtitle area.
+const loadingStageText = computed(() => {
+  const stage = music.getLoadingStage;
+  if (stage === "resolving") return t("player.loading.resolving");
+  if (stage === "buffering") return t("player.loading.buffering");
+  if (stage === "stalled") return t("player.loading.stalled");
+  if (stage === "error") return t("player.loading.error");
+  return t("player.loading.loading");
+});
 
 // 歌曲进度条更新
 const sliderDragEnd = () => {
@@ -1027,7 +1060,9 @@ const fetchAndParseLyric = async (id) => {
   left: var(--sidebar-width, 240px);
   width: calc(100% - var(--sidebar-width, 240px));
   z-index: 2;
-  transition: left 0.3s ease, width 0.3s ease;
+  transition:
+    left 0.3s ease,
+    width 0.3s ease;
 
   // Acrylic background — override Naive UI card bg
   background-color: var(--acrylic-bg, rgba(255, 255, 255, 0.45)) !important;
@@ -1035,9 +1070,11 @@ const fetchAndParseLyric = async (id) => {
   backdrop-filter: blur(20px) saturate(180%);
   border-top: 1px solid var(--acrylic-border, rgba(0, 0, 0, 0.04));
 
-  // Mobile: player sits above tab bar, no sidebar
+  // Mobile: player sits above tab bar, no sidebar.
+  // --app-safe-area-bottom is env(safe-area-inset-bottom) on Tauri mobile,
+  // 0px everywhere else — so this calc is a no-op on desktop.
   @media (max-width: 768px) {
-    bottom: 56px;
+    bottom: calc(56px + var(--app-safe-area-bottom, 0px));
     left: 0;
     width: 100%;
   }
@@ -1179,6 +1216,31 @@ const fetchAndParseLyric = async (id) => {
         .artisrOrLrc {
           font-size: 12px;
           margin-top: 2px;
+
+          .loading-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--n-text-color-3, #aaa);
+            font-size: 11px;
+            letter-spacing: 0.02em;
+
+            // Animated ellipsis to show live activity
+            &::after {
+              content: "";
+              display: inline-block;
+              width: 3px;
+              height: 3px;
+              border-radius: 50%;
+              background: currentColor;
+              animation: loading-dot-pulse 1.2s ease-in-out infinite;
+            }
+          }
+        }
+
+        @keyframes loading-dot-pulse {
+          0%, 100% { opacity: 0.3; transform: scale(0.8); }
+          50%       { opacity: 1;   transform: scale(1.2); }
         }
       }
     }

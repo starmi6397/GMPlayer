@@ -1,13 +1,16 @@
 <template>
-  <nav :class="{ 'tauri-app': (isTauri && !isMobile) }" :data-tauri-drag-region="isTauri || undefined">
-    <div class="left" :data-tauri-drag-region="(isTauri && !isMobile) || undefined">
+  <nav
+    :class="{ 'tauri-app': isTauri() && !isMobileState }"
+    :data-tauri-drag-region="isTauri() || undefined"
+  >
+    <div class="left" :data-tauri-drag-region="(isTauri() && !isMobileState) || undefined">
       <div class="controls">
         <n-icon size="22" :component="Left" @click="router.go(-1)" />
         <n-icon size="22" :component="Right" @click="router.go(1)" />
       </div>
       <span v-if="routeTitle" class="route-title">{{ routeTitle }}</span>
     </div>
-    <div class="right" :data-tauri-drag-region="(isTauri && !isMobile) || undefined">
+    <div class="right" :data-tauri-drag-region="(isTauri() && !isMobileState) || undefined">
       <SearchInp />
       <!-- Theme toggle -->
       <n-icon
@@ -29,12 +32,18 @@ import { useI18n } from "vue-i18n";
 import AboutSite from "@/components/DataModal/AboutSite.vue";
 import SearchInp from "@/components/SearchInp/index.vue";
 import { isTauri, isMobile } from "@/utils/tauri";
+import { ref, onMounted, computed } from "vue";
 
 const router = useRouter();
 const route = useRoute();
 const setting = settingStore();
 const { t } = useI18n();
 const aboutSiteRef = ref(null);
+const isMobileState = ref(false);
+
+onMounted(async () => {
+  isMobileState.value = await isMobile();
+});
 
 // Route name → i18n key mapping
 const routeTitleMap = {
@@ -99,6 +108,10 @@ nav {
   align-items: center;
   max-width: 1400px;
   margin: 0 auto;
+  // Push nav content below the status-bar / notch on Tauri mobile.
+  // --app-safe-area-top is 0px on all non-tauri-mobile platforms so
+  // this is a no-op in every other environment.
+  padding-top: var(--app-safe-area-top, 0px);
 
   // Tauri window controls reserved space
   &.tauri-app {
@@ -123,7 +136,9 @@ nav {
         border-radius: 8px;
         padding: 4px;
         cursor: pointer;
-        transition: background-color 0.2s, transform 0.2s;
+        transition:
+          background-color 0.2s,
+          transform 0.2s;
 
         @media (min-width: 640px) {
           &:hover {
@@ -158,7 +173,10 @@ nav {
       cursor: pointer;
       padding: 6px;
       border-radius: 8px;
-      transition: background-color 0.2s, transform 0.2s, color 0.2s;
+      transition:
+        background-color 0.2s,
+        transform 0.2s,
+        color 0.2s;
 
       &:hover {
         background-color: rgba(0, 0, 0, 0.05);

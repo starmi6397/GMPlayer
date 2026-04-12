@@ -101,6 +101,7 @@ interface MusicDataState {
   spectrumsScaleData: number;
   lowFreqVolume: number;
   isLoadingSong: boolean;
+  loadingStage: "idle" | "resolving" | "buffering" | "stalled" | "error";
   preloadedSongIds: Set<number>;
   autoMixState: AutoMixStateData;
   persistData: PersistData;
@@ -137,6 +138,7 @@ const useMusicDataStore = defineStore("musicData", {
       spectrumsScaleData: 1,
       lowFreqVolume: 0,
       isLoadingSong: false,
+      loadingStage: "idle",
       preloadedSongIds: new Set(),
       autoMixState: {
         phase: "idle",
@@ -180,6 +182,9 @@ const useMusicDataStore = defineStore("musicData", {
     },
     getLoadingState(state): boolean {
       return state.isLoadingSong;
+    },
+    getLoadingStage(state): "idle" | "resolving" | "buffering" | "stalled" | "error" {
+      return state.loadingStage;
     },
     getDailySongs(state): SongData[] {
       return state.dailySongsData;
@@ -844,6 +849,7 @@ const useMusicDataStore = defineStore("musicData", {
 
     setLoadingState(state: boolean) {
       this.isLoadingSong = state;
+      if (!state) this.loadingStage = "idle";
     },
   },
   persist: [

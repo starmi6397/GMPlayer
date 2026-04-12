@@ -19,7 +19,11 @@
       >
         <template v-if="!isLocked">
           <div class="header-left">
-            <span class="song-name" :title="state.title" :data-tauri-drag-region="!isLocked || undefined">
+            <span
+              class="song-name"
+              :title="state.title"
+              :data-tauri-drag-region="!isLocked || undefined"
+            >
               {{ state.title || $t("desktopLyrics.noLyrics") }}
             </span>
           </div>
@@ -153,11 +157,7 @@
         >
           <div class="lyric-inner" :style="lyricTextStyle">
             <template v-if="line.isCurrent && line.words.length > 1 && bridge.settings.showYrc">
-              <span
-                v-for="(word, wi) in line.words"
-                :key="wi"
-                class="lyric-word"
-              >
+              <span v-for="(word, wi) in line.words" :key="wi" class="lyric-word">
                 <span class="word-bg">{{ word.word }}</span>
                 <span class="word-fill" :style="getWordStyle(word)">{{ word.word }}</span>
               </span>
@@ -168,9 +168,7 @@
                 :ref="setContentRef(line.key)"
                 :style="getScrollStyle(line)"
               >
-                <span class="lyric-text" :class="{ current: line.isCurrent }">{{
-                  line.text
-                }}</span>
+                <span class="lyric-text" :class="{ current: line.isCurrent }">{{ line.text }}</span>
               </span>
             </template>
           </div>
@@ -202,7 +200,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, shallowRef, onMounted, onUnmounted, type ComponentPublicInstance } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  shallowRef,
+  onMounted,
+  onUnmounted,
+  type ComponentPublicInstance,
+} from "vue";
 import { usePlayerBridge } from "@/utils/tauri/playerBridge";
 import { windowManager } from "@/utils/tauri/windowManager";
 import type { AMLLLine, AMLLWord } from "@/utils/LyricsProcessor";
@@ -386,7 +392,11 @@ const renderLyricLines = computed<VisibleLine[]>(() => {
 function getWordStyle(word: AMLLWord) {
   const duration = word.endTime - word.startTime;
   if (duration <= 0) return { clipPath: "inset(0 0% 0 0)" };
-  const progress = clamp((interpolatedTimeMs.value - word.startTime + LYRIC_LOOKAHEAD) / duration, 0, 1);
+  const progress = clamp(
+    (interpolatedTimeMs.value - word.startTime + LYRIC_LOOKAHEAD) / duration,
+    0,
+    1,
+  );
   return {
     clipPath: `inset(0 ${(1 - progress) * 100}% 0 0)`,
   };
@@ -482,11 +492,7 @@ function getScrollStyle(line: VisibleLine) {
   const lineDuration = line.lineEndTime - line.lineStartTime;
   if (lineDuration <= 0) return {};
 
-  const lineProgress = clamp(
-    (interpolatedTimeMs.value - line.lineStartTime) / lineDuration,
-    0,
-    1,
-  );
+  const lineProgress = clamp((interpolatedTimeMs.value - line.lineStartTime) / lineDuration, 0, 1);
 
   // Start scrolling at 30% progress, finish 2s before line end
   const scrollStartProgress = 0.3;

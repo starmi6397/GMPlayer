@@ -1,7 +1,5 @@
 <template>
-  <div
-    :class="['mobile-tab-bar', { dark: setting.getSiteTheme === 'dark' }]"
-  >
+  <div :class="['mobile-tab-bar', { dark: setting.getSiteTheme === 'dark' }]">
     <div
       v-for="tab in tabs"
       :key="tab.key"
@@ -46,7 +44,10 @@ const isActive = (tab) => {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 56px;
+  // --app-safe-area-bottom is env(safe-area-inset-bottom) on Tauri mobile,
+  // 0px everywhere else — so this is a no-op on desktop / browser.
+  height: calc(56px + var(--app-safe-area-bottom, 0px));
+  padding-bottom: var(--app-safe-area-bottom, 0px);
   background-color: var(--acrylic-bg, rgba(255, 255, 255, 0.45));
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);

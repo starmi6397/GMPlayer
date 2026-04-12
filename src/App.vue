@@ -8,7 +8,7 @@
     <div :class="['app-body', music.showBigPlayer ? 'bigplayer-open' : '']">
       <div class="app-layout-wrapper" :style="{ '--sidebar-width': setting.sidebarCollapsed ? '64px' : '240px' }">
         <Sidebar />
-        <n-layout class="app-layout" style="height: 100vh">
+        <n-layout class="app-layout" style="height: 100vh;">
           <n-layout-header :data-tauri-drag-region="isTauri() || undefined">
             <Nav />
           </n-layout-header>
@@ -322,7 +322,7 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .n-layout-header {
-  height: 54px;
+  height: calc(54px + var(--app-safe-area-top, 0px));
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -347,7 +347,7 @@ onMounted(() => {
 }
 
 .n-layout-content {
-  top: 54px;
+  top: calc(54px + var(--app-safe-area-top, 0px));
   transition: all 0.3s;
   background-color: transparent !important;
 
@@ -355,13 +355,17 @@ onMounted(() => {
     bottom: 70px;
 
     @media (max-width: 768px) {
-      bottom: 126px; // 70px player + 56px tab bar
+      // 70px player + 56px tab bar + safe-area-bottom (home indicator).
+      // --app-safe-area-bottom is env(safe-area-inset-bottom) on Tauri mobile,
+      // 0px everywhere else — so this calc is a no-op on desktop / browser.
+      bottom: calc(126px + var(--app-safe-area-bottom, 0px));
     }
   }
 
   @media (max-width: 768px) {
     &:not(.show) {
-      bottom: 56px; // tab bar only
+      // 56px tab bar only + safe-area-bottom (home indicator).
+      bottom: calc(56px + var(--app-safe-area-bottom, 0px));
     }
   }
 
