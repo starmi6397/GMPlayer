@@ -34,7 +34,7 @@ class MediaNotification(private val activity: Activity) : Plugin(activity) {
             playbackService = localBinder.getService()
             isBound = true
             // Link the media session callbacks to notify JS
-            playbackService?.mediaSession?.setCallback(mediaSessionCallback)
+            playbackService?.setMediaSessionCallback(mediaSessionCallback)
             pendingFlush?.invoke()
             pendingFlush = null
         }

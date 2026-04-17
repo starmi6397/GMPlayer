@@ -21,7 +21,8 @@ class MediaPlaybackService : Service() {
         const val NOTIFICATION_ID = 1
     }
 
-    lateinit var mediaSession: MediaSessionCompat
+    private var mediaSession: MediaSessionCompat? = null
+    private var pendingSessionCallback: MediaSessionCompat.Callback? = null
     private var hasStartedForeground = false
 
     private var currentTitle = "GMPlayer"
@@ -40,12 +41,11 @@ class MediaPlaybackService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        setupMediaSession()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Handle media button intents (from notification or external hardware)
-        MediaButtonReceiver.handleIntent(mediaSession, intent)
+        mediaSession?.let { MediaButtonReceiver.handleIntent(it, intent) }
 
         // Avoid resetting to an "initializing" notification on every start.
         ensureNotificationShown()
@@ -55,12 +55,19 @@ class MediaPlaybackService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
-        mediaSession.isActive = false
-        mediaSession.release()
+        mediaSession?.let {
+            it.isActive = false
+            it.release()
+        }
         super.onDestroy()
     }
 
     // ─── Public methods for Plugin ──────────────────────────────────────────
+
+    fun setMediaSessionCallback(callback: MediaSessionCompat.Callback) {
+        pendingSessionCallback = callback
+        mediaSession?.setCallback(callback)
+    }
 
     fun updateMediaSessionMeta(
         title:    String,
@@ -75,6 +82,9 @@ class MediaPlaybackService : Service() {
         currentDuration = duration
         currentArtwork = artwork
 
+        // Only create MediaSession when we actually have something to represent.
+        ensureMediaSessionIfNeeded()
+
         val metadataBuilder = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE,     title)
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST,    artist)
@@ -86,7 +96,10 @@ class MediaPlaybackService : Service() {
             metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, it)
         }
         
-        mediaSession.setMetadata(metadataBuilder.build())
+        mediaSession?.setMetadata(metadataBuilder.build())
+
+        // If metadata arrives while already playing, push a full notification refresh.
+        if (currentIsPlaying) updateNotificationInternal()
     }
 
     fun updatePlaybackState(isPlaying: Boolean, position: Long, duration: Long) {
@@ -94,24 +107,26 @@ class MediaPlaybackService : Service() {
         currentPosition = position
         currentDuration = duration
 
+        ensureMediaSessionIfNeeded()
+
         val stateCode = if (isPlaying)
             PlaybackStateCompat.STATE_PLAYING
         else
             PlaybackStateCompat.STATE_PAUSED
 
-        mediaSession.setPlaybackState(
+        mediaSession?.setPlaybackState(
             PlaybackStateCompat.Builder()
                 .setState(stateCode, position, if (isPlaying) 1f else 0f)
                 .setActions(
                     PlaybackStateCompat.ACTION_PLAY             or
-                    PlaybackStateCompat.ACTION_PAUSE            or
-                    PlaybackStateCompat.ACTION_PLAY_PAUSE       or
-                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT     or
-                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
-                    PlaybackStateCompat.ACTION_STOP             or
-                    PlaybackStateCompat.ACTION_SEEK_TO,
+                        PlaybackStateCompat.ACTION_PAUSE            or
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE       or
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT     or
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                        PlaybackStateCompat.ACTION_STOP             or
+                        PlaybackStateCompat.ACTION_SEEK_TO,
                 )
-                .build()
+                .build(),
         )
 
         // Keep the foreground notification in sync with playback state.
@@ -142,13 +157,25 @@ class MediaPlaybackService : Service() {
     }
 
     private fun setupMediaSession() {
-        mediaSession = MediaSessionCompat(this, "SPlayerMediaSession").apply {
+        val session = MediaSessionCompat(this, "SPlayerMediaSession").apply {
             setFlags(
                 MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
                 MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS,
             )
             isActive = true
         }
+        pendingSessionCallback?.let { session.setCallback(it) }
+        mediaSession = session
+    }
+
+    private fun ensureMediaSessionIfNeeded() {
+        if (mediaSession != null) return
+
+        val hasTrackInfo = currentTitle.isNotBlank() || currentArtist.isNotBlank() || currentAlbum.isNotBlank()
+        val hasTimeline = currentDuration > 0
+        if (!currentIsPlaying && !hasTrackInfo && !hasTimeline) return
+
+        setupMediaSession()
     }
 
     private fun ensureNotificationShown() {
@@ -243,11 +270,14 @@ class MediaPlaybackService : Service() {
                     PlaybackStateCompat.ACTION_SKIP_TO_NEXT,
                 ),
             )
-            .setStyle(
+
+        mediaSession?.let { session ->
+            builder.setStyle(
                 MediaStyle()
-                    .setMediaSession(mediaSession.sessionToken)
+                    .setMediaSession(session.sessionToken)
                     .setShowActionsInCompactView(0, 1, 2),
             )
+        }
 
         if (currentDuration > 0) {
             val max = currentDuration.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
