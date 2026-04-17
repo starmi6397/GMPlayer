@@ -134,19 +134,19 @@ impl<R: Runtime> MediaNotificationHandle<R> {
     /// This is the heavyweight call — use it when the song changes or the cover art URL
     /// changes.  For frequent position ticks prefer [`update_progress`].
     pub fn update_notification(&self, req: &MediaSessionRequest) -> tauri::Result<()> {
-        self.0.run_mobile_plugin::<()>("updateNotification", req)
+        Ok(self.0.run_mobile_plugin::<()>("updateNotification", req)?)
     }
 
     /// Lightweight position + playing-state update (metadata and artwork unchanged).
     ///
     /// Intended to be called roughly once per second while the player is active.
     pub fn update_progress(&self, req: &UpdateProgressRequest) -> tauri::Result<()> {
-        self.0.run_mobile_plugin::<()>("updateProgress", req)
+        Ok(self.0.run_mobile_plugin::<()>("updateProgress", req)?)
     }
 
     /// Dismiss the system notification and stop the foreground `MediaPlaybackService`.
     pub fn hide_notification(&self) -> tauri::Result<()> {
-        self.0.run_mobile_plugin::<()>("hideNotification", ())
+        Ok(self.0.run_mobile_plugin::<()>("hideNotification", ())?)
     }
 }
 
@@ -208,7 +208,7 @@ unsafe impl<R: Runtime + Sync> Sync for MediaNotificationHandle<R> {}
 /// | `listen(…)` event name                              | Kotlin trigger              |
 /// |-----------------------------------------------------|-----------------------------|
 /// | `'plugin:media-notification:mediaAction'`           | `trigger("mediaAction", …)` |
-pub fn init<R: Runtime>() -> TauriPlugin<R> {
+pub fn init<R: Runtime + Send + Sync>() -> TauriPlugin<R> {
     Builder::new("media-notification")
         .setup(|app, mut api| {
             #[cfg(target_os = "android")]

@@ -95,30 +95,27 @@ pub fn run() {
         .expect("error while building tauri application");
 
     app.run(|app_handle, event| {
-        match &event {
-            RunEvent::WindowEvent { label, event, .. } => {
-                // Handle desktop lyrics window events (moved/resized/destroyed)
-                window::desktop_lyrics::commands::handle_desktop_lyrics_event(
-                    app_handle, label, event,
-                );
+        if let RunEvent::WindowEvent { label, event, .. } = &event {
+            // Handle desktop lyrics window events (moved/resized/destroyed)
+            window::desktop_lyrics::commands::handle_desktop_lyrics_event(
+                app_handle, label, event,
+            );
 
-                match (label.as_str(), event) {
-                    // Main window close → save state, emit to frontend for close-behavior decision
-                    ("main", WindowEvent::CloseRequested { api, .. }) => {
-                        api.prevent_close();
-                        let _ = app_handle.save_window_state(WINDOW_STATE_FLAGS);
-                        let _ = app_handle.emit("main-close-requested", ());
-                    }
-                    // Tray popup loses focus → hide it
-                    ("tray-popup", WindowEvent::Focused(false)) => {
-                        if let Some(popup) = app_handle.get_webview_window("tray-popup") {
-                            let _ = popup.hide();
-                        }
-                    }
-                    _ => {}
+            match (label.as_str(), event) {
+                // Main window close → save state, emit to frontend for close-behavior decision
+                ("main", WindowEvent::CloseRequested { api, .. }) => {
+                    api.prevent_close();
+                    let _ = app_handle.save_window_state(WINDOW_STATE_FLAGS);
+                    let _ = app_handle.emit("main-close-requested", ());
                 }
+                // Tray popup loses focus → hide it
+                ("tray-popup", WindowEvent::Focused(false)) => {
+                    if let Some(popup) = app_handle.get_webview_window("tray-popup") {
+                        let _ = popup.hide();
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         }
     });
 }
