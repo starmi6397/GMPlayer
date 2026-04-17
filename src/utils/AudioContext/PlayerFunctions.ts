@@ -120,6 +120,7 @@ const startSpectrumUpdate = (sound: ISound, music: ReturnType<typeof musicStore>
   const settings = settingStore();
   const needsSpectrum = settings.musicFrequency;
   const needsLowFreq = settings.dynamicFlowSpeed;
+  const autoMix = getAutoMixEngine();
 
   const updateLoop = (): void => {
     if (!sound) {
@@ -128,7 +129,6 @@ const startSpectrumUpdate = (sound: ISound, music: ReturnType<typeof musicStore>
     }
 
     // AutoMix: monitor playback position per frame
-    const autoMix = getAutoMixEngine();
     autoMix.monitorPlayback(sound);
 
     // Skip spectrum computation when page is not visible
