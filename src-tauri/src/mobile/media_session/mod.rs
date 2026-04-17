@@ -123,7 +123,7 @@ pub struct MediaNotificationHandle<R: Runtime>(PluginHandle<R>);
 
 /// No-op placeholder so that state-management code compiles on non-Android targets.
 #[cfg(not(target_os = "android"))]
-pub struct MediaNotificationHandle<R: Runtime>(std::marker::PhantomData<R>);
+pub struct MediaNotificationHandle<R: Runtime>(std::marker::PhantomData<fn() -> R>);
 
 // ── Android implementation ────────────────────────────────────────────────────
 
@@ -174,8 +174,16 @@ impl<R: Runtime> MediaNotificationHandle<R> {
 }
 
 // Safety: PluginHandle<R> is Send + Sync; PhantomData<R> is Send + Sync when R is.
-unsafe impl<R: Runtime + Send> Send for MediaNotificationHandle<R> {}
-unsafe impl<R: Runtime + Sync> Sync for MediaNotificationHandle<R> {}
+//
+// We must ensure the managed app state is `Send + Sync` even when the runtime `R`
+// (e.g. Wry) itself is not `Send/Sync`. The handle does not expose `R` across threads;
+// it is only used as a type parameter for invoking the registered mobile plugin.
+//
+// - On Android, `PluginHandle<R>` is `Send + Sync`.
+// - On non-Android, we use `PhantomData<fn() -> R>` which does not inherit auto-traits
+//   from `R`.
+unsafe impl<R: Runtime> Send for MediaNotificationHandle<R> {}
+unsafe impl<R: Runtime> Sync for MediaNotificationHandle<R> {}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Plugin init
@@ -208,9 +216,9 @@ unsafe impl<R: Runtime + Sync> Sync for MediaNotificationHandle<R> {}
 /// | `listen(…)` event name                              | Kotlin trigger              |
 /// |-----------------------------------------------------|-----------------------------|
 /// | `'plugin:media-notification:mediaAction'`           | `trigger("mediaAction", …)` |
-pub fn init<R: Runtime + Send + Sync>() -> TauriPlugin<R> {
+pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("media-notification")
-        .setup(|app, mut api| {
+        .setup(|app, api| {
             #[cfg(target_os = "android")]
             {
                 let handle =
@@ -222,7 +230,7 @@ pub fn init<R: Runtime + Send + Sync>() -> TauriPlugin<R> {
             // We still store a PhantomData handle so state look-ups compile everywhere.
             #[cfg(not(target_os = "android"))]
             {
-                let _ = &mut api;
+                let _ = &api;
                 app.manage(MediaNotificationHandle::<R>(std::marker::PhantomData));
             }
 
