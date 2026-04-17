@@ -65,6 +65,8 @@ const MOBILE_OPTIONS: Required<EffectManagerOptions> = {
   },
 };
 
+const EMPTY_U8 = new Uint8Array(0);
+
 /**
  * AudioEffectManager - Hybrid analysis engine
  */
@@ -134,7 +136,7 @@ export class AudioEffectManager {
         if (!this._wasmFFT.isReady()) {
           console.warn("AudioEffectManager: WasmFFTManager failed to initialize");
         }
-        this._cachedWasmSpectrum = new Array(this.options.fftOutputSize).fill(0);
+        this._cachedWasmSpectrum = Array.from({ length: this.options.fftOutputSize }, () => 0);
       }
     } catch (err) {
       console.error("AudioEffectManager: Failed to initialize nodes", err);
@@ -223,26 +225,27 @@ export class AudioEffectManager {
    * @returns Uint8Array containing byte frequency data (0-255)
    */
   getFrequencyData(force: boolean = false): Uint8Array<ArrayBuffer> {
-    if (!this.analyserNode || !this._frequencyBuffer) {
-      return this._frequencyBuffer || new Uint8Array(0);
-    }
+    const buffer = this._frequencyBuffer;
+    const analyser = this.analyserNode;
+    if (!analyser || !buffer) return (EMPTY_U8 as Uint8Array<ArrayBuffer>);
 
     const now = performance.now();
     if (!force && now - this._lastUpdateTime < this.options.minUpdateInterval) {
-      return this._frequencyBuffer;
+      return buffer;
     }
 
-    this.analyserNode.getByteFrequencyData(this._frequencyBuffer);
+    analyser.getByteFrequencyData(buffer);
 
     // Compute average in same pass
     let sum = 0;
-    for (let i = 0; i < this._frequencyBuffer.length; i++) {
-      sum += this._frequencyBuffer[i];
+    const len = buffer.length;
+    for (let i = 0; i < len; i++) {
+      sum += buffer[i];
     }
-    this._lastAverage = sum / this._frequencyBuffer.length;
+    this._lastAverage = sum / len;
 
     this._lastUpdateTime = now;
-    return this._frequencyBuffer;
+    return buffer;
   }
 
   /**
@@ -305,7 +308,7 @@ export class AudioEffectManager {
 
     const binCount = Math.min(this.options.lowFreqBinCount, this._frequencyBuffer.length);
     if (this._analyserLowFreqBins.length !== binCount) {
-      this._analyserLowFreqBins = new Array(binCount).fill(0);
+      this._analyserLowFreqBins = Array.from({ length: binCount }, () => 0);
     }
     for (let i = 0; i < binCount; i++) {
       // Scale 0-255 dB-compressed bytes to approximate raw FFT magnitude range
@@ -385,7 +388,7 @@ export class AudioEffectManager {
       try {
         this._workletNode.port.onmessage = null;
         this._workletNode.disconnect();
-      } catch (e) {
+      } catch {
         // May already be disconnected
       }
       this._workletNode = null;
@@ -394,7 +397,7 @@ export class AudioEffectManager {
     if (this.analyserNode) {
       try {
         this.analyserNode.disconnect();
-      } catch (e) {
+      } catch {
         // May already be disconnected
       }
       this.analyserNode = null;
