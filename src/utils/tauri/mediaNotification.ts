@@ -1,76 +1,65 @@
 /**
- * JS/TS bridge to the Android `media-notification` Tauri plugin.
+ * JS/TS bridge to `tauri-plugin-media-session`.
  *
- * Architecture:
- *   JS  ──invoke──►  Rust plugin  ──JNI──►  Kotlin @Command   (commands)
- *   JS  ◄──listen──  Rust plugin  ◄──JNI──  Kotlin trigger()  (events)
+ * This module keeps the same external interface that `useAndroidMediaSession.ts`
+ * already relies on so that no call-site changes are needed.  Internally it
+ * translates between our ms-based API and the plugin's seconds-based API.
  *
- * Plugin identifier : "media-notification"
- * Kotlin class      : com.gbclstudio.gmplayer.MediaNotification
+ * Plugin identifier : "media-session"
+ * Repo             : https://github.com/sak96/tauri-plugin-media-session
  *
  * All exported functions are safe to call outside Tauri (browser / desktop):
  * they check `isTauri()` first and return silently if the environment is wrong.
- * The `invoke` call also fails-safe if the plugin is not available (e.g. iOS).
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, addPluginListener } from "@tauri-apps/api/core";
 import { isTauri } from "./windowManager";
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Types
+// Types (public interface — kept identical so call-sites need no changes)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Full metadata + state payload for `updateNotification`.
- *
- * Field names are camelCase to match the Kotlin `@Command` argument names exactly.
- * Times are in **milliseconds** (Kotlin side uses `Long`).
+ * Full metadata + state payload for `updateMediaNotification`.
+ * Times are in **milliseconds** (we divide by 1000 before calling the plugin).
  */
 export interface MediaNotificationRequest {
-  /** Track title shown as the notification's content title. */
   title: string;
-  /** Primary artist string (artist names joined with ", "). */
   artist: string;
-  /** Album name shown as the notification sub-text. */
   album: string;
-  /** Whether the player is currently playing (controls the play/pause button icon). */
   isPlaying: boolean;
   /** Current playback position in **milliseconds**. */
   position: number;
   /** Total track duration in **milliseconds**. */
   duration: number;
-  /**
-   * HTTP/HTTPS URL for the album cover art.
-   * The Kotlin side fetches and caches the bitmap; pass an empty string to
-   * keep the previously displayed artwork.
-   */
+  /** HTTP/HTTPS URL for album cover art.  Empty string = use app-icon fallback. */
   artworkUrl: string;
 }
 
 /**
- * Lightweight position + playing-state payload for `updateProgress`.
- *
- * Use this for play/pause toggles and seek events so the notification's
- * `MediaSession` state stays in sync without re-fetching artwork.
+ * Lightweight position + playing-state payload for `updateMediaProgress`.
+ * Times are in **milliseconds**.
  */
 export interface UpdateProgressRequest {
-  /** Whether the player is currently playing. */
   isPlaying: boolean;
   /** Current playback position in **milliseconds**. */
   position: number;
 }
 
 /**
- * Event payload pushed from Kotlin via `trigger("mediaAction", payload)`.
- *
- * Received in JavaScript as the payload of the
- * `"plugin:media-notification:mediaAction"` Tauri event.
- *
- * The `action` field identifies the control that was activated:
- * - `"play"` / `"pause"` — notification play/pause button or hardware key
- * - `"next"` / `"previous"` — skip buttons
- * - `"stop"` — stop action (e.g. swiping away the notification)
- * - `"seek"` — MediaSession seek-to; `position` (ms) is set
+ * Playback state payload for `updateMediaPlaybackState`.
+ * Used to indicate buffering, playing, or paused states.
+ */
+export interface UpdatePlaybackStateRequest {
+  /** Current playback state */
+  state: "playing" | "paused" | "buffering";
+  /** Current playback position in **milliseconds**. */
+  position: number;
+}
+
+/**
+ * Media action event delivered by `listenMediaAction`.
+ * `position` is in **milliseconds** when present (seek target).
  */
 export interface MediaActionPayload {
   action: "play" | "pause" | "next" | "previous" | "stop" | "seek";
@@ -78,158 +67,160 @@ export interface MediaActionPayload {
   position?: number;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Internal helpers
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/** Tauri plugin command prefix. */
-const PLUGIN = "plugin:media-notification";
-
 /**
- * Invoke a plugin command with graceful degradation.
- *
- * - Returns `undefined` and logs a warning when the call fails (plugin not
- *   available, non-Android build, etc.).
- * - Returns `undefined` immediately when not running inside Tauri.
+ * Audio focus state delivered by `listenAudioFocusChange`.
  */
+export type AudioFocusState =
+  | "gain"
+  | "loss"
+  | "loss_transient"
+  | "loss_transient_can_duck";
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Internal
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const PLUGIN = "media-session";
+
 async function call<T = void>(
   command: string,
-  args?: Record<string, unknown>,
+  args: Record<string, unknown> = {},
 ): Promise<T | undefined> {
   if (!isTauri()) return undefined;
   try {
-    return await invoke<T>(`${PLUGIN}|${command}`, args ?? {});
+    return await invoke<T>(`plugin:${PLUGIN}|${command}`, args);
   } catch (err) {
-    // Expected on non-Android Tauri builds (iOS, desktop) — log as warning,
-    // not error, because this is not a bug from the caller's perspective.
-    console.warn(`[MediaNotification] invoke "${command}" failed:`, err);
+    console.warn(`[MediaSession] "${command}" failed:`, err);
     return undefined;
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Commands  (JS → Android)
+// Commands  (JS → Android / iOS)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Push a full metadata + playback-state update to the Android system notification
- * and `MediaSession`.
- *
- * This is the **heavyweight** call because the Kotlin side may need to fetch the
- * cover art bitmap over the network.  Call it when:
- * - A new track starts playing.
- * - The cover art URL changes.
- *
- * For frequent position ticks or play/pause toggling, prefer
- * {@link updateMediaProgress} to avoid redundant bitmap fetches.
- *
- * @example
- * ```ts
- * await updateMediaNotification({
- *   title: 'Song Name',
- *   artist: 'Artist A, Artist B',
- *   album: 'Album Title',
- *   isPlaying: true,
- *   position: 12_000,   // 12 s
- *   duration: 240_000,  // 4 min
- *   artworkUrl: 'https://example.com/cover.jpg?param=256y256',
- * });
- * ```
+ * Push a full metadata + playback-state update to the native MediaSession.
+ * Internally calls `update_state` on the plugin with times converted to seconds.
  */
 export function updateMediaNotification(
   req: MediaNotificationRequest,
 ): Promise<void | undefined> {
-  return call("updateNotification", req as unknown as Record<string, unknown>);
+  return call("update_state", {
+    title: req.title || undefined,
+    artist: req.artist || undefined,
+    album: req.album || undefined,
+    artworkUrl: req.artworkUrl || undefined,
+    isPlaying: req.isPlaying,
+    position: req.position / 1_000, // ms → s
+    duration: req.duration / 1_000, // ms → s
+    // Always advertise all controls so prev / next / seek buttons are shown.
+    canPrev: true,
+    canNext: true,
+    canSeek: true,
+  });
 }
 
 /**
- * Lightweight position + playing-state update.
- *
- * The Kotlin plugin maintains its own 1-second position ticker, so this does
- * **not** need to be called on every time tick.  Call it when:
- * - The play/pause state changes.
- * - The user seeks to a new position.
- * - The app returns to the foreground after a period of inactivity.
- *
- * @example
- * ```ts
- * await updateMediaProgress({ isPlaying: false, position: 34_500 });
- * ```
+ * Lightweight playing-state + position update.
+ * Internally calls `update_state` (not `update_timeline`) so `isPlaying` is
+ * also updated atomically with the position.
  */
 export function updateMediaProgress(
   req: UpdateProgressRequest,
 ): Promise<void | undefined> {
-  return call("updateProgress", req as unknown as Record<string, unknown>);
+  return call("update_state", {
+    isPlaying: req.isPlaying,
+    position: req.position / 1_000, // ms → s
+  });
 }
 
 /**
- * Dismiss the system notification and stop the `MediaPlaybackService`
- * foreground service.
- *
- * **Important**: do *not* call this when the app merely goes to the background —
- * the notification must persist so that lock-screen / Bluetooth controls
- * continue working.  Call it only when playback is definitively stopped:
- * - The playlist becomes empty.
- * - The user explicitly quits.
- * - The component that hosts the player is destroyed.
- *
- * @example
- * ```ts
- * await hideMediaNotification();
- * ```
+ * Update only the playback state without changing metadata.
+ * Used to indicate buffering state during loading.
+ */
+export function updateMediaPlaybackState(
+  req: UpdatePlaybackStateRequest,
+): Promise<void | undefined> {
+  return call("update_state", {
+    playbackState: req.state,
+    position: req.position / 1_000, // ms → s
+  });
+}
+
+/**
+ * Dismiss the native media notification and release session resources.
  */
 export function hideMediaNotification(): Promise<void | undefined> {
-  return call("hideNotification");
+  return call("clear");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Events  (Android → JS)
+// Events  (native → JS)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Subscribe to media control actions emitted by the Android notification panel,
+ * Subscribe to media control actions from the notification panel,
  * lock screen, or hardware media keys.
  *
- * Internally this is equivalent to
- * `listen("plugin:media-notification:mediaAction", handler)` — the Tauri event
- * that the Kotlin `trigger("mediaAction", payload)` call delivers to the WebView.
+ * Normalises the plugin event format (seekPosition in **seconds**) to our
+ * internal format (position in **milliseconds**) so call-sites are unchanged.
  *
- * @param handler - Callback invoked with the {@link MediaActionPayload} whenever
- *   the user interacts with a media control.
- * @returns A promise that resolves to an **unlisten function**.  Call it in
- *   `onUnmounted` or any other cleanup path to prevent memory leaks.
- *
- * @example
- * ```ts
- * const unlisten = await listenMediaAction(({ action, position }) => {
- *   if (action === 'play')  music.setPlayState(true);
- *   if (action === 'pause') music.setPlayState(false);
- *   if (action === 'next')  music.setPlaySongIndex('next');
- *   if (action === 'seek' && position !== undefined) setSeek($player, position / 1000);
- * });
- *
- * // Later, in onUnmounted:
- * unlisten();
- * ```
+ * @returns An unlisten function — call it in `onUnmounted` to clean up.
  */
 export async function listenMediaAction(
   handler: (payload: MediaActionPayload) => void,
 ): Promise<() => void> {
   if (!isTauri()) return () => {};
 
-  const tauri = window.__TAURI__;
-  if (!tauri?.event) return () => {};
+  try {
+    // The plugin emits { action, seekPosition?: number } where seekPosition is seconds.
+    const listener = await addPluginListener<{ action: string; seekPosition?: number }>(
+      PLUGIN,
+      "media_action",
+      (event) => {
+        const payload: MediaActionPayload = {
+          action: event.action as MediaActionPayload["action"],
+        };
+        // Convert seekPosition (seconds) → position (milliseconds) for our handlers.
+        if (event.action === "seek" && typeof event.seekPosition === "number") {
+          payload.position = Math.round(event.seekPosition * 1_000);
+        }
+        handler(payload);
+      },
+    );
+    return () => listener.unregister();
+  } catch (err) {
+    console.warn("[MediaSession] listenMediaAction failed:", err);
+    return () => {};
+  }
+}
+
+/**
+ * Subscribe to audio focus changes from the Android system.
+ *
+ * When another app requests audio focus (e.g. phone call, voice message),
+ * the system will notify us so we can pause or duck playback.
+ *
+ * @returns An unlisten function — call it in `onUnmounted` to clean up.
+ */
+export async function listenAudioFocusChange(
+  handler: (state: AudioFocusState) => void,
+): Promise<() => void> {
+  if (!isTauri()) return () => {};
 
   try {
-    // Plugin events from Kotlin `trigger("eventName", data)` arrive as
-    // "plugin:<pluginName>:<eventName>" in the Tauri event system.
-    const unlisten = await tauri.event.listen<MediaActionPayload>(
-      `${PLUGIN}:mediaAction`,
-      (event) => handler(event.payload),
+    const listener = await addPluginListener<{ state: string }>(
+      PLUGIN,
+      "audio_focus_change",
+      (event) => {
+        handler(event.state as AudioFocusState);
+      },
     );
-    return unlisten;
+    return () => listener.unregister();
   } catch (err) {
-    console.warn("[MediaNotification] listenMediaAction failed:", err);
+    // Plugin may not support audio_focus_change yet — log and return no-op
+    console.warn("[MediaSession] listenAudioFocusChange failed (plugin may not support it):", err);
     return () => {};
   }
 }

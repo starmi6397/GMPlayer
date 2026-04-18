@@ -1,27 +1,53 @@
 package com.gbclstudio.gmplayer
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
-  override fun onCreate(savedInstanceState: Bundle?) {
-    // 启用全屏设计
-    enableEdgeToEdge()
-    super.onCreate(savedInstanceState)
-    
-    // 获取根视图 (优先寻找 layout 中的 main，否则使用 android.R.id.content)
-    val rootView = findViewById<View>(R.id.main) ?: findViewById<View>(android.R.id.content)
-    
-    // 注意：installCompatInsetsDispatch 仅在某些 androidx.core 版本中作为内部/实验性 API 存在。
-    // 如果该方法不可用，通常 enableEdgeToEdge() 已经处理了大部分分发逻辑。
 
-    // Edge-to-edge：不在原生层做 padding 偏移；安全区交给前端用 CSS 变量处理。
-    ViewCompat.setOnApplyWindowInsetsListener(rootView) { v, insets ->
-      // 保持 insets 继续分发给子视图（包括 WebView），让前端能拿到真实 safe-area。
-      ViewCompat.onApplyWindowInsets(v, insets)
+    // 申请通知权限（Android 13+ 必需）
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Log.d("MainActivity", "Notification permission granted")
+        } else {
+            Log.w("MainActivity", "Notification permission denied")
+        }
     }
-  }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // 启用全屏设计
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+        
+        val rootView = findViewById<View>(R.id.main) ?: findViewById<View>(android.R.id.content)
+        
+        // Edge-to-edge 安全区处理
+        ViewCompat.setOnApplyWindowInsetsListener(rootView) { v, insets ->
+            ViewCompat.onApplyWindowInsets(v, insets)
+        }
+
+        checkAndRequestPermissions()
+    }
+
+    private fun checkAndRequestPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 }

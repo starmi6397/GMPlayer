@@ -55,6 +55,7 @@
     "sass": "^1.99.0",
     "screenfull": "^6.0.2",
     "swiper": "^11.2.10",
+    "tauri-plugin-media-api": "^0.1.1",
     "throttle-debounce": "^5.0.2",
     "ts-md5": "^2.0.1",
     "vite-plugin-top-level-await": "^1.6.0",

@@ -10,10 +10,13 @@
  *        • Duration available (audio loaded) → re-sync with correct duration
  *        • Play / pause → lightweight `updateMediaProgress`
  *        • Time ticks   → throttled drift correction (every 5 s)
+ *        • Loading state → update playback state to reflect buffering
  *   3. Media-action handler — routes Kotlin `trigger("mediaAction", …)` events back to
  *        the Pinia store so the in-app UI stays in sync with lock-screen controls.
  *   4. Visibility change — re-syncs position when the app returns to the foreground.
- *   5. On unmount — unsubscribes from events and hides the notification.
+ *   5. Audio focus handling — responds to audio focus changes from the system.
+ *   6. Error handling — updates notification state when playback errors occur.
+ *   7. On unmount — unsubscribes from events and hides the notification.
  *
  * Usage (call once from Player/index.vue <script setup>):
  *   ```ts
@@ -23,16 +26,20 @@
  */
 
 import { ref, watch, onMounted, onUnmounted } from "vue";
-import { debounce, throttle } from "throttle-debounce";
+import { debounce } from "throttle-debounce";
+import { storeToRefs } from "pinia";
 import { musicStore } from "@/store";
 import { isTauri, isMobile } from "@/utils/tauri";
 import { setSeek } from "@/utils/AudioContext";
 import {
   updateMediaNotification,
   updateMediaProgress,
+  updateMediaPlaybackState,
   hideMediaNotification,
   listenMediaAction,
+  listenAudioFocusChange,
   type MediaActionPayload,
+  type AudioFocusState,
 } from "@/utils/tauri/mediaNotification";
 
 // ─── Module-level singleton guard ─────────────────────────────────────────────
@@ -41,6 +48,7 @@ let _instanceCount = 0;
 
 export function useAndroidMediaSession() {
   const music = musicStore();
+  const { persistData } = storeToRefs(music);
 
   /**
    * Becomes `true` once we have confirmed the runtime is Tauri + mobile.
@@ -51,6 +59,16 @@ export function useAndroidMediaSession() {
 
   /** Unlisten function returned by `listenMediaAction`. */
   let unlistenMediaAction: (() => void) | null = null;
+
+  /** Unlisten function returned by `listenAudioFocusChange`. */
+  let unlistenAudioFocus: (() => void) | null = null;
+
+  /** Track last sent payload hash to avoid redundant IPC calls */
+  let _lastPayloadHash = "";
+
+  /** Track last progress sync timestamp */
+  let _lastProgressSyncTime = 0;
+  const PROGRESS_SYNC_INTERVAL = 5_000; // ms
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Payload helpers
@@ -70,6 +88,8 @@ export function useAndroidMediaSession() {
       ? song.album.picUrl.replace(/^http:/, "https:") + "?param=256y256"
       : "";
 
+    const playSongTime = persistData.value.playSongTime;
+
     return {
       title: song.name || "",
       artist:
@@ -78,15 +98,21 @@ export function useAndroidMediaSession() {
           : "",
       album: song.album?.name || "",
       isPlaying: music.getPlayState,
-      // Store keeps times in **seconds**; Kotlin expects **milliseconds**.
-      position: Math.round((music.getPlaySongTime.currentTime || 0) * 1_000),
-      duration: Math.round((music.getPlaySongTime.duration || 0) * 1_000),
+      position: Math.round((playSongTime?.currentTime || 0) * 1_000),
+      duration: Math.round((playSongTime?.duration || 0) * 1_000),
       artworkUrl,
     };
   }
 
+  /**
+   * Compute a simple hash of the payload for deduplication.
+   */
+  function hashPayload(obj: Record<string, unknown>): string {
+    return JSON.stringify(obj);
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
-  // Sync functions
+  // Core sync functions
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
@@ -100,37 +126,91 @@ export function useAndroidMediaSession() {
     if (!active.value) return;
 
     const payload = buildFullPayload();
+    if (!payload) {
+      await hideMediaNotification();
+      return;
+    }
+
+    // Deduplication: skip if payload hasn't changed
+    const hash = hashPayload(payload);
+    if (hash === _lastPayloadHash) return;
+    _lastPayloadHash = hash;
+
+    await updateMediaNotification(payload);
+  });
+
+  /**
+   * Immediate full notification update (no debounce).
+   * Used for critical state changes like song switches where we need
+   * the notification to update right away.
+   */
+  async function syncNotificationImmediate(): Promise<void> {
+    if (!active.value) return;
+
+    // Cancel any pending debounced call to avoid double-send
+    syncNotification.cancel?.();
+
+    const payload = buildFullPayload();
     if (payload) {
+      _lastPayloadHash = hashPayload(payload);
       await updateMediaNotification(payload);
     } else {
-      // No song loaded — dismiss the notification.
       await hideMediaNotification();
     }
-  });
+  }
 
   /**
    * Lightweight progress + playing-state update.
    *
-   * Used for play/pause toggles and user-initiated seeks.  Does NOT re-fetch
-   * artwork.
+   * Used for play/pause toggles and user-initiated seeks.
+   * Does NOT re-fetch artwork.
    */
   async function syncProgress(): Promise<void> {
     if (!active.value || !music.getPlaySongData) return;
 
+    const playSongTime = persistData.value.playSongTime;
     await updateMediaProgress({
       isPlaying: music.getPlayState,
-      position: Math.round((music.getPlaySongTime.currentTime || 0) * 1_000),
+      position: Math.round((playSongTime?.currentTime || 0) * 1_000),
+    });
+
+    _lastProgressSyncTime = Date.now();
+  }
+
+  /**
+   * Update only the playback state (playing/paused/buffering).
+   * Used when loading state changes to show buffering indicator.
+   */
+  async function syncPlaybackState(): Promise<void> {
+    if (!active.value || !music.getPlaySongData) return;
+
+    // Map internal state to MediaSession playback state
+    let state: "playing" | "paused" | "buffering" = "paused";
+    if (music.isLoadingSong) {
+      state = "buffering";
+    } else if (music.getPlayState) {
+      state = "playing";
+    }
+
+    const playSongTime = persistData.value.playSongTime;
+    await updateMediaPlaybackState({
+      state,
+      position: Math.round((playSongTime?.currentTime || 0) * 1_000),
     });
   }
 
   /**
-   * Throttled position correction (max once per 5 s).
-   *
-   * The Kotlin plugin maintains its own 1-second ticker that increments the
-   * stored position.  This correction keeps it from drifting relative to the
-   * actual Web Audio playback position.
+   * Periodic position sync — called on every currentTime change but
+   * enforces a minimum interval to prevent IPC spam.
    */
-  const syncProgressCorrected = throttle(5_000, syncProgress);
+  function maybeSyncProgress(): void {
+    if (!active.value) return;
+
+    const now = Date.now();
+    if (now - _lastProgressSyncTime < PROGRESS_SYNC_INTERVAL) return;
+
+    syncProgress();
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Media-action handler  (Android → JS)
@@ -179,9 +259,10 @@ export function useAndroidMediaSession() {
           }
           // Keep the store's displayed time in sync immediately so the UI
           // updates without waiting for the next audio-time callback.
+          const currentDuration = persistData.value.playSongTime?.duration || 0;
           music.setPlaySongTime({
             currentTime: seekSec,
-            duration: music.getPlaySongTime.duration,
+            duration: currentDuration,
           });
           // Push the corrected position back to the Kotlin MediaSession so the
           // notification progress bar doesn't jump.
@@ -191,6 +272,57 @@ export function useAndroidMediaSession() {
 
       default:
         console.warn("[AndroidMediaSession] Unknown mediaAction:", payload.action);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Audio focus handler (Android → JS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Handles audio focus changes from the Android system.
+   * When another app requests audio focus (e.g. phone call, voice message),
+   * we should pause playback.
+   */
+  function handleAudioFocusChange(state: AudioFocusState): void {
+    console.log("[AndroidMediaSession] audioFocusChange →", state);
+
+    switch (state) {
+      case "gain":
+        // We regained audio focus — resume if we were playing
+        if (music.getPlayState && window.$player && !window.$player.playing()) {
+          music.setPlayState(true);
+        }
+        break;
+
+      case "loss":
+        // Permanent loss — pause playback
+        if (music.getPlayState) {
+          music.setPlayState(false);
+        }
+        break;
+
+      case "loss_transient":
+        // Temporary loss (e.g. phone call, notification sound) — pause
+        if (music.getPlayState) {
+          music.setPlayState(false);
+        }
+        break;
+
+      case "loss_transient_can_duck":
+        // Temporary loss but we can duck (lower volume)
+        // For now, just lower volume to 20%
+        if (music.getPlayState && window.$player) {
+          // Store original volume if not already stored
+          if (!window._originalVolumeBeforeDuck) {
+            window._originalVolumeBeforeDuck = music.persistData.playVolume;
+          }
+          music.persistData.playVolume = Math.max(0.1, window._originalVolumeBeforeDuck * 0.2);
+        }
+        break;
+
+      default:
+        break;
     }
   }
 
@@ -206,7 +338,8 @@ export function useAndroidMediaSession() {
     if (!active.value) return;
     if (document.visibilityState === "visible") {
       console.log("[AndroidMediaSession] App foregrounded — syncing progress.");
-      syncProgress();
+      // Full sync to recover from any drift while in background
+      syncNotificationImmediate();
     }
   }
 
@@ -235,6 +368,9 @@ export function useAndroidMediaSession() {
     // Subscribe to media-control events from the notification panel.
     unlistenMediaAction = await listenMediaAction(handleMediaAction);
 
+    // Subscribe to audio focus changes
+    unlistenAudioFocus = await listenAudioFocusChange(handleAudioFocusChange);
+
     // Subscribe to app foreground/background transitions.
     document.addEventListener("visibilitychange", onVisibilityChange);
 
@@ -249,6 +385,8 @@ export function useAndroidMediaSession() {
     // Remove event subscriptions.
     unlistenMediaAction?.();
     unlistenMediaAction = null;
+    unlistenAudioFocus?.();
+    unlistenAudioFocus = null;
     document.removeEventListener("visibilitychange", onVisibilityChange);
 
     // Dismiss the notification when the player component is destroyed.
@@ -269,14 +407,29 @@ export function useAndroidMediaSession() {
    * Song metadata changed → full notification update.
    *
    * Covers: new song selected, playlist changed, personal FM, AutoMix.
+   * Uses immediate sync on song ID change to ensure the notification
+   * shows the new song right away.
    */
   watch(
     () => music.getPlaySongData,
-    (val) => {
+    (val, oldVal) => {
       if (!active.value) return;
-      if (val) {
-        syncNotification();
+
+      const isNewSong = val?.id !== oldVal?.id;
+      if (isNewSong) {
+        // Reset deduplication hash so the new song's metadata is always sent
+        _lastPayloadHash = "";
+        // Reset progress sync timer so the first position update goes through
+        _lastProgressSyncTime = 0;
+        // Use immediate sync for song changes — no debounce
+        syncNotificationImmediate();
       } else {
+        // Same song, metadata may have changed (e.g. liked status)
+        // Use debounced sync to avoid hammering IPC
+        syncNotification();
+      }
+
+      if (!val) {
         hideMediaNotification();
       }
     },
@@ -287,18 +440,18 @@ export function useAndroidMediaSession() {
    * Duration became available (audio element finished loading metadata) →
    * re-sync so the notification displays the correct total track length.
    *
-   * Without this watch the initial `syncNotification` call (fired immediately
-   * on song change) often carries `duration = 0` because the audio hasn't
-   * loaded yet.
+   * This is critical because the initial song-change sync often carries
+   * duration = 0 (audio hasn't loaded yet). When duration arrives we
+   * must push it to the notification immediately.
    */
   watch(
-    () => music.getPlaySongTime.duration,
-    (val) => {
-      if (!active.value || !val) return;
-      // Duration just arrived — update without debounce so the notification
-      // shows the correct total length as quickly as possible.
-      syncNotification.cancel?.();
-      syncNotification();
+    () => persistData.value.playSongTime?.duration,
+    (val, oldVal) => {
+      if (!active.value) return;
+      // Only sync when duration transitions from 0/undefined to a real value
+      if (val && !oldVal) {
+        syncNotificationImmediate();
+      }
     },
   );
 
@@ -317,17 +470,35 @@ export function useAndroidMediaSession() {
   );
 
   /**
-   * Playback position tick → throttled drift correction.
-   *
-   * The Kotlin ticker increments the stored position by 1 000 ms every second.
-   * This watch ensures the notification never drifts more than 5 s from the
-   * actual Web Audio position.  Throttling prevents IPC call spam.
+   * Loading state changed → update playback state to show buffering.
+   * When loading finishes (isLoadingSong → false), also trigger a
+   * progress sync so the notification shows the current position.
    */
   watch(
-    () => music.getPlaySongTime.currentTime,
+    () => music.isLoadingSong,
+    (isLoading) => {
+      if (!active.value) return;
+      syncPlaybackState();
+      // When loading finishes, sync progress immediately so the notification
+      // doesn't stay at the old position
+      if (!isLoading) {
+        syncProgress();
+      }
+    },
+  );
+
+  /**
+   * Playback position tick → periodic drift correction.
+   *
+   * Uses a time-based gate (5s interval) instead of throttle to avoid
+   * the "first call executes, rest ignored" behavior of throttle which
+   * can cause missed updates after song changes.
+   */
+  watch(
+    () => persistData.value.playSongTime?.currentTime,
     () => {
       if (!active.value) return;
-      syncProgressCorrected();
+      maybeSyncProgress();
     },
   );
 
@@ -338,7 +509,13 @@ export function useAndroidMediaSession() {
   return {
     /** Force a full notification sync (metadata + artwork + state). */
     syncNotification,
+    /** Force an immediate full notification sync (no debounce). */
+    syncNotificationImmediate,
     /** Force an immediate progress sync (position + isPlaying). */
     syncProgress,
+    /** Force an immediate playback state sync (playing/paused/buffering). */
+    syncPlaybackState,
+    /** Whether the media session is active (Tauri mobile). */
+    active,
   };
 }

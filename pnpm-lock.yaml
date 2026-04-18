@@ -122,6 +122,9 @@ importers:
       swiper:
         specifier: ^11.2.10
         version: 11.2.10
+      tauri-plugin-media-api:
+        specifier: ^0.1.1
+        version: 0.1.1
       throttle-debounce:
         specifier: ^5.0.2
         version: 5.0.2
@@ -3737,6 +3740,9 @@ packages:
 
   tar-mini@0.2.0:
     resolution: {integrity: sha512-+qfUHz700DWnRutdUsxRRVZ38G1Qr27OetwaMYTdg8hcPxf46U0S1Zf76dQMWRBmusOt2ZCK5kbIaiLkoGO7WQ==}
+
+  tauri-plugin-media-api@0.1.1:
+    resolution: {integrity: sha512-mS80IO5gEgUSeVokMYJAqnrE3OWjS3ES7C6tYLNelBkrVhX9iNWKZhI/XB8wyWkNv+mA5wAjRY3t+oEzrDapMQ==}
 
   temp-dir@2.0.0:
     resolution: {integrity: sha512-aoBAniQmmwtcKp/7BzsH8Cxzv8OL736p7v1ihGb5e9DJ9kTwGWHrQrVB5+lfVDzfGrdRzXch+ig7LHaY1JTOrg==}
@@ -7814,6 +7820,10 @@ snapshots:
   symbol-observable@1.2.0: {}
 
   tar-mini@0.2.0: {}
+
+  tauri-plugin-media-api@0.1.1:
+    dependencies:
+      '@tauri-apps/api': 2.10.1
 
   temp-dir@2.0.0: {}
 

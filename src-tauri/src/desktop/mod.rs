@@ -97,9 +97,7 @@ pub fn run() {
     app.run(|app_handle, event| {
         if let RunEvent::WindowEvent { label, event, .. } = &event {
             // Handle desktop lyrics window events (moved/resized/destroyed)
-            window::desktop_lyrics::commands::handle_desktop_lyrics_event(
-                app_handle, label, event,
-            );
+            window::desktop_lyrics::commands::handle_desktop_lyrics_event(app_handle, label, event);
 
             match (label.as_str(), event) {
                 // Main window close → save state, emit to frontend for close-behavior decision
