@@ -11,6 +11,7 @@
     "core:event:allow-emit",
     "http:default",
     "log:default",
-    "media-session:default"
+    "media-session:default",
+    "allow-set-orientation"
   ]
 }

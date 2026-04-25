@@ -81,6 +81,8 @@ import Pagination from "@/components/Pagination/index.vue";
 import Plyr from "plyr";
 import "plyr/dist/plyr.css";
 import type { CommentResourceType } from "@/api";
+import { lockLandscape, lockPortrait } from "@/utils/tauri/screenOrientation";
+import { isTauri } from "@/utils/tauri";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -222,6 +224,15 @@ onMounted(() => {
     music.setPlayBarState(false);
     music.setPlayState(false);
   });
+  // 监听全屏变化，在 Tauri Android 上控制屏幕方向
+  if (isTauri()) {
+    player.value.on("enterfullscreen", () => {
+      lockLandscape();
+    });
+    player.value.on("exitfullscreen", () => {
+      lockPortrait();
+    });
+  }
 });
 
 onActivated(() => {
@@ -242,6 +253,10 @@ onBeforeUnmount(() => {
   music.setPlayBarState(true);
   if (player.value) {
     player.value.destroy();
+  }
+  // 恢复屏幕方向为 portrait（如果之前在视频全屏时锁定了 landscape）
+  if (isTauri()) {
+    lockPortrait();
   }
 });
 

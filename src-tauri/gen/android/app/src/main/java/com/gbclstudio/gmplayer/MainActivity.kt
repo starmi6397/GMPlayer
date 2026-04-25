@@ -28,9 +28,9 @@ class MainActivity : TauriActivity() {
         // 启用全屏设计
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        
+
         val rootView = findViewById<View>(R.id.main) ?: findViewById<View>(android.R.id.content)
-        
+
         // Edge-to-edge 安全区处理
         ViewCompat.setOnApplyWindowInsetsListener(rootView) { v, insets ->
             ViewCompat.onApplyWindowInsets(v, insets)

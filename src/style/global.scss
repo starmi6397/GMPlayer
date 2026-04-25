@@ -94,6 +94,17 @@ body,
 
 // Message — 毛玻璃浮动卡片
 .n-message-container {
+  // 桌面端：顶部居中
+  &.n-message-container--top {
+    top: 16px !important;
+  }
+  // 移动端：顶部居中，更贴近屏幕边缘
+  &.n-message-container--top-mobile {
+    top: 8px !important;
+    left: 8px !important;
+    right: 8px !important;
+    transform: none !important;
+  }
   .n-message-wrapper {
     margin-bottom: 8px;
   }
@@ -124,12 +135,50 @@ body,
   }
 }
 
+// 移动端消息样式优化
+@media (max-width: 768px) {
+  .n-message-container {
+    &.n-message-container--top,
+    &.n-message-container--top-mobile {
+      top: 8px !important;
+      left: 12px !important;
+      right: 12px !important;
+      width: auto !important;
+      transform: none !important;
+    }
+    .n-message {
+      width: 100% !important;
+      max-width: none !important;
+      justify-content: center;
+    }
+  }
+  .n-notification-container {
+    &.n-notification-container--top {
+      top: 8px !important;
+      left: 12px !important;
+      right: 12px !important;
+      width: auto !important;
+      transform: none !important;
+    }
+    .n-notification {
+      width: 100% !important;
+      max-width: none !important;
+    }
+  }
+}
+
 // Notification
 .n-notification {
   border-radius: 12px !important;
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.12),
     0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+// 桌面端通知位置微调
+.n-notification-container--top-right {
+  top: 16px !important;
+  right: 16px !important;
 }
 
 // Nalert

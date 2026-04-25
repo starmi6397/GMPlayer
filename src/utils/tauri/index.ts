@@ -21,6 +21,14 @@ export {
   type UpdateProgressRequest,
   type MediaActionPayload,
 } from "./mediaNotification";
+
+// Screen orientation control (Android)
+export {
+  setScreenOrientation,
+  lockLandscape,
+  lockPortrait,
+  unlockOrientation,
+} from "./screenOrientation";
 export function isMobileDevice(): boolean {
   if (typeof window === "undefined" || !window.navigator) return false;
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(

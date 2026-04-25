@@ -70,11 +70,7 @@ export interface MediaActionPayload {
 /**
  * Audio focus state delivered by `listenAudioFocusChange`.
  */
-export type AudioFocusState =
-  | "gain"
-  | "loss"
-  | "loss_transient"
-  | "loss_transient_can_duck";
+export type AudioFocusState = "gain" | "loss" | "loss_transient" | "loss_transient_can_duck";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Internal
@@ -103,9 +99,7 @@ async function call<T = void>(
  * Push a full metadata + playback-state update to the native MediaSession.
  * Internally calls `update_state` on the plugin with times converted to seconds.
  */
-export function updateMediaNotification(
-  req: MediaNotificationRequest,
-): Promise<void | undefined> {
+export function updateMediaNotification(req: MediaNotificationRequest): Promise<void | undefined> {
   return call("update_state", {
     title: req.title || undefined,
     artist: req.artist || undefined,
@@ -126,9 +120,7 @@ export function updateMediaNotification(
  * Internally calls `update_state` (not `update_timeline`) so `isPlaying` is
  * also updated atomically with the position.
  */
-export function updateMediaProgress(
-  req: UpdateProgressRequest,
-): Promise<void | undefined> {
+export function updateMediaProgress(req: UpdateProgressRequest): Promise<void | undefined> {
   return call("update_state", {
     isPlaying: req.isPlaying,
     position: req.position / 1_000, // ms → s

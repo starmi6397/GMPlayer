@@ -92,10 +92,9 @@ export function useAndroidMediaSession() {
 
     return {
       title: song.name || "",
-      artist:
-        Array.isArray(song.artist)
-          ? song.artist.map((a: { name: string }) => a.name).join(", ")
-          : "",
+      artist: Array.isArray(song.artist)
+        ? song.artist.map((a: { name: string }) => a.name).join(", ")
+        : "",
       album: song.album?.name || "",
       isPlaying: music.getPlayState,
       position: Math.round((playSongTime?.currentTime || 0) * 1_000),
