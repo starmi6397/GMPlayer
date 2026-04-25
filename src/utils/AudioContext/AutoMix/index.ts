@@ -53,6 +53,8 @@ export type {
   OutroType,
   OutroAnalysis,
   IntroAnalysis,
+  Phrase,
+  PhraseAnalysis,
 } from "./TrackAnalyzer";
 
 // BPM

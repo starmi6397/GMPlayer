@@ -76,6 +76,9 @@ export class TransitionStateMachine {
   private _effectiveEnd: number = 0;
   private _outroType: OutroType | null = null;
 
+  // Phrase-aware mix-out point (outgoing track)
+  private _phraseMixOutTime: number | null = null;
+
   // Incoming sound during crossfade
   private _incomingSound: ISound | null = null;
 
@@ -89,6 +92,7 @@ export class TransitionStateMachine {
   private _settingsSmartCurve: boolean = true;
   private _settingsTransitionEffects: boolean = true;
   private _settingsVocalGuard: boolean = true;
+  private _settingsPhraseAlign: boolean = true;
 
   // Async guard: prevent duplicate analysis
   private _analyzingInFlight: boolean = false;
@@ -188,6 +192,7 @@ export class TransitionStateMachine {
     this._settingsSmartCurve = this._settingStoreRef.autoMixSmartCurve ?? true;
     this._settingsTransitionEffects = this._settingStoreRef.autoMixTransitionEffects ?? true;
     this._settingsVocalGuard = this._settingStoreRef.autoMixVocalGuard ?? true;
+    this._settingsPhraseAlign = this._settingStoreRef.autoMixPhraseAlign ?? true;
   }
 
   private _shouldBeActive(): boolean {
@@ -366,6 +371,9 @@ export class TransitionStateMachine {
 
     this._crossfadeDuration = this._getEffectiveCrossfadeDuration(effectiveEnd);
 
+    // Reset phrase mix point
+    this._phraseMixOutTime = null;
+
     const outro = this._currentAnalysis?.analysis.outro;
     if (outro) {
       this._outroType = outro.outroType;
@@ -442,7 +450,27 @@ export class TransitionStateMachine {
       this._crossfadeStartTime = effectiveEnd - this._crossfadeDuration;
     }
 
-    // Beat-align
+    // Phrase-aware mix point selection (DJ-style 16-beat phrase alignment)
+    const phrases = this._currentAnalysis?.analysis.phrases;
+    if (this._settingsPhraseAlign && phrases?.mixOutPhrase) {
+      const phraseStart = phrases.mixOutPhrase.start;
+      // Only use phrase mix point if it's within reasonable range of the computed start
+      const phraseDiff = Math.abs(phraseStart - this._crossfadeStartTime);
+      const maxPhraseShift = this._crossfadeDuration * 0.75;
+
+      if (phraseDiff <= maxPhraseShift && phraseStart < effectiveEnd - MIN_CROSSFADE_DURATION) {
+        this._phraseMixOutTime = phraseStart;
+        this._crossfadeStartTime = phraseStart;
+        if (IS_DEV) {
+          console.log(
+            `TransitionStateMachine: Phrase-aligned mix-out at ${phraseStart.toFixed(1)}s ` +
+              `(phrase #${phrases.mixOutPhrase.index})`,
+          );
+        }
+      }
+    }
+
+    // Beat-align (skip for certain outro types where timing is less critical)
     const skipBeatAlign =
       this._outroType === "fadeOut" ||
       this._outroType === "reverbTail" ||
@@ -470,7 +498,10 @@ export class TransitionStateMachine {
           `duration=${this._crossfadeDuration.toFixed(1)}s` +
           (trailingSilence > 0 ? `, trailingSilence=${trailingSilence.toFixed(1)}s` : "") +
           (this._outroType ? `, outroType=${this._outroType}` : "") +
-          (outro ? `, confidence=${outro.outroConfidence.toFixed(2)}` : ""),
+          (outro ? `, confidence=${outro.outroConfidence.toFixed(2)}` : "") +
+          (this._phraseMixOutTime !== null
+            ? `, phraseMix=${this._phraseMixOutTime.toFixed(1)}s`
+            : ""),
       );
     }
   }
@@ -1213,6 +1244,7 @@ export class TransitionStateMachine {
     this._nextAnalysis = null;
     this._incomingSound = null;
     this._lastStrategy = null;
+    this._phraseMixOutTime = null;
     this._evictCache();
 
     if (this._finishingTimerId !== null) {
@@ -1285,6 +1317,7 @@ export class TransitionStateMachine {
     this._pendingNextIndex = -1;
     this._isPaused = false;
     this._activeGainAdjustment = 1;
+    this._phraseMixOutTime = null;
     this._state = "idle";
     this._updateStoreState();
 

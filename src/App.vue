@@ -6,9 +6,12 @@
   <!-- Normal app layout -->
   <Provider v-else>
     <div :class="['app-body', music.showBigPlayer ? 'bigplayer-open' : '']">
-      <div class="app-layout-wrapper" :style="{ '--sidebar-width': setting.sidebarCollapsed ? '64px' : '240px' }">
+      <div
+        class="app-layout-wrapper"
+        :style="{ '--sidebar-width': setting.sidebarCollapsed ? '64px' : '240px' }"
+      >
         <Sidebar />
-        <n-layout class="app-layout" style="height: 100vh;">
+        <n-layout class="app-layout" style="height: 100vh">
           <n-layout-header :data-tauri-drag-region="isTauri() || undefined">
             <Nav />
           </n-layout-header>
@@ -317,7 +320,6 @@ onMounted(() => {
     windowManager.showWindow("main");
   }
 });
-
 </script>
 
 <style lang="scss" scoped>

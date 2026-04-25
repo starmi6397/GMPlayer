@@ -533,7 +533,9 @@ export class NativeSound implements ISound {
    * @returns Uint8Array containing frequency data
    */
   getFrequencyData(): Uint8Array<ArrayBuffer> {
-    return this._effectManager ? this._effectManager.getFrequencyData() : (EMPTY_U8 as Uint8Array<ArrayBuffer>);
+    return this._effectManager
+      ? this._effectManager.getFrequencyData()
+      : (EMPTY_U8 as Uint8Array<ArrayBuffer>);
   }
 
   /**

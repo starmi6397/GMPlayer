@@ -47,6 +47,20 @@ interface BPMResult {
   analysisOffset: number;
 }
 
+interface Phrase {
+  start: number;
+  end: number;
+  index: number;
+}
+
+interface PhraseAnalysis {
+  phrases: Phrase[];
+  /** Suggested mix-out phrase (outro → intro transition point) */
+  mixOutPhrase: Phrase | null;
+  /** Suggested mix-in phrase for incoming track */
+  mixInPhrase: Phrase | null;
+}
+
 interface SpectralFingerprint {
   /** Serialized as plain number[] for transfer (no Float32Array across postMessage) */
   bands: number[];
@@ -92,6 +106,7 @@ interface AnalysisResponse {
   fingerprint: SpectralFingerprint;
   outro: OutroAnalysis | null;
   intro: IntroAnalysis | null;
+  phrases: PhraseAnalysis | null;
   duration: number;
 }
 
@@ -427,6 +442,112 @@ function generateBeatGrid(bpm: number, durationSec: number): number[] {
     beats.push(t);
   }
   return beats;
+}
+
+/**
+ * Detect phrases from beat grid.
+ * A phrase = 16 beats (4 bars in 4/4 time), the standard DJ phrase length.
+ */
+function detectPhrases(beatGrid: number[]): Phrase[] {
+  const beatsPerPhrase = 16;
+  const phrases: Phrase[] = [];
+
+  for (let i = 0; i < beatGrid.length; i += beatsPerPhrase) {
+    const endIdx = i + beatsPerPhrase;
+    if (endIdx < beatGrid.length) {
+      phrases.push({
+        start: beatGrid[i],
+        end: beatGrid[endIdx],
+        index: i / beatsPerPhrase,
+      });
+    }
+  }
+
+  return phrases;
+}
+
+/**
+ * Compute coarse energy curve for phrase-based mix point selection.
+ * Returns energy at ~1-second resolution for the outro region.
+ */
+function getEnergyCurve(
+  data: Float32Array,
+  sampleRate: number,
+  windowSize: number = 2048,
+): number[] {
+  const curve: number[] = [];
+  for (let i = 0; i < data.length; i += windowSize) {
+    let sum = 0;
+    const end = Math.min(i + windowSize, data.length);
+    for (let j = i; j < end; j++) {
+      sum += Math.abs(data[j]);
+    }
+    curve.push(sum / (end - i));
+  }
+  return curve;
+}
+
+/**
+ * Find the best mix-out point based on phrase boundaries and energy drop.
+ * Returns the phrase where the outgoing track should start fading.
+ */
+function findMixOutPhrase(phrases: Phrase[], energyCurve: number[]): Phrase | null {
+  if (phrases.length < 4) return phrases.length > 0 ? phrases[phrases.length - 2] : null;
+
+  // Scan from phrase 2 onward, looking for energy drop > 30% (outro detection)
+  for (let i = 2; i < phrases.length; i++) {
+    const phraseIdx = Math.floor(phrases[i].start);
+    const prevIdx = Math.floor(phrases[i - 1].start);
+    if (phraseIdx >= energyCurve.length || prevIdx >= energyCurve.length) continue;
+
+    const curr = energyCurve[phraseIdx] || 1;
+    const prev = energyCurve[prevIdx] || 1;
+
+    if (curr < prev * 0.7) {
+      return phrases[i];
+    }
+  }
+
+  // Fallback: 4th phrase from end (standard DJ practice)
+  return phrases[phrases.length - 4];
+}
+
+/**
+ * Find the best mix-in point for the incoming track.
+ * Typically the first phrase after any silent intro.
+ */
+function findMixInPhrase(phrases: Phrase[], introEndOffset: number): Phrase | null {
+  if (phrases.length === 0) return null;
+
+  // Find first phrase that starts after the intro ends
+  for (const phrase of phrases) {
+    if (phrase.start >= introEndOffset) {
+      return phrase;
+    }
+  }
+
+  return phrases[0];
+}
+
+/**
+ * Full phrase analysis: detect phrases and find mix points.
+ */
+function analyzePhrases(
+  bpmResult: BPMResult | null,
+  energyCurve: number[],
+  introEndOffset: number,
+): PhraseAnalysis | null {
+  if (!bpmResult || bpmResult.confidence < 0.3 || bpmResult.beatGrid.length < 32) {
+    return null;
+  }
+
+  const phrases = detectPhrases(bpmResult.beatGrid);
+  if (phrases.length < 2) return null;
+
+  const mixOutPhrase = findMixOutPhrase(phrases, energyCurve);
+  const mixInPhrase = findMixInPhrase(phrases, introEndOffset);
+
+  return { phrases, mixOutPhrase, mixInPhrase };
 }
 
 function runBPMDetection(
@@ -1884,6 +2005,10 @@ self.onmessage = (e: MessageEvent<AnalysisRequest>) => {
       duration,
     );
 
+    // Phrase analysis for beat-aligned DJ-style transitions
+    const energyCurve = getEnergyCurve(monoData, sampleRate);
+    const phrases = analyzePhrases(bpm, energyCurve, intro?.introEndOffset ?? 0);
+
     const response: AnalysisResponse = {
       type: "result",
       id,
@@ -1893,6 +2018,7 @@ self.onmessage = (e: MessageEvent<AnalysisRequest>) => {
       fingerprint,
       outro,
       intro,
+      phrases,
       duration,
     };
 

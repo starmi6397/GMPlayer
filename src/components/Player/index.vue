@@ -51,60 +51,53 @@
             <!-- 显示歌手或歌词 -->
             <div class="artisrOrLrc" v-if="music.getPlaySongData">
               <Transition name="fade" mode="out-in">
-                <!-- Loading phase: show stage text instead of lyrics/artist -->
-                <span v-if="music.isLoadingSong" key="loading" class="loading-status">
-                  {{ loadingStageText }}
-                </span>
-                <!-- Lyric mode -->
-                <Transition
-                  v-else-if="setting.bottomLyricShow"
-                  key="lyric-mode"
-                  name="fade"
-                  mode="out-in"
-                >
-                  <n-text
-                    v-if="
-                      music.getPlaySongLyric?.lrc?.length &&
-                      setting.showYrc &&
-                      music.getPlaySongLyricIndex != -1 &&
-                      music.getPlaySongLyric.hasYrc
-                    "
-                    :key="'yrc-' + music.getPlaySongLyricIndex"
-                    class="lrc text-hidden"
-                  >
+                <template v-if="setting.bottomLyricShow">
+                  <Transition name="fade" mode="out-in">
                     <n-text
-                      v-for="item in music.getPlaySongLyric.yrc[music.getPlaySongLyricIndex]
-                        .content"
-                      :key="item"
+                      v-if="
+                        music.getPlaySongLyric?.lrc?.length &&
+                        setting.showYrc &&
+                        music.getPlaySongLyricIndex != -1 &&
+                        music.getPlaySongLyric.hasYrc
+                      "
+                      :key="'yrc-' + music.getPlaySongLyricIndex"
+                      class="lrc text-hidden"
                       :depth="3"
                     >
-                      {{ item.content }}
+                      <span ref="lrcScrollRef" class="lrc-scroll-content" :style="lrcScrollStyle">
+                        <span
+                          v-for="item in music.getPlaySongLyric.yrc[music.getPlaySongLyricIndex]
+                            .content"
+                          :key="item.time"
+                          class="lrc-word"
+                        >
+                          {{ item.content }}
+                        </span>
+                      </span>
                     </n-text>
-                  </n-text>
-                  <n-text
-                    v-else-if="
-                      music.getPlaySongLyric?.lrc?.length && music.getPlaySongLyricIndex != -1
-                    "
-                    :key="'lrc-' + music.getPlaySongLyricIndex"
-                    class="lrc text-hidden"
-                    :depth="3"
-                  >
-                    {{ music.getPlaySongLyric.lrc[music.getPlaySongLyricIndex]?.content }}
-                  </n-text>
-                  <AllArtists
-                    v-else
-                    key="artists"
-                    class="text-hidden"
-                    :artistsData="music.getPlaySongData.artist"
-                  />
-                </Transition>
-                <!-- Artist mode -->
-                <AllArtists
-                  v-else
-                  key="artist-mode"
-                  class="text-hidden"
-                  :artistsData="music.getPlaySongData.artist"
-                />
+                    <n-text
+                      v-else-if="
+                        music.getPlaySongLyric?.lrc?.length && music.getPlaySongLyricIndex != -1
+                      "
+                      :key="'lrc-' + music.getPlaySongLyricIndex"
+                      class="lrc text-hidden"
+                      :depth="3"
+                    >
+                      <span ref="lrcScrollRef" class="lrc-scroll-content" :style="lrcScrollStyle">
+                        {{ music.getPlaySongLyric.lrc[music.getPlaySongLyricIndex]?.content }}
+                      </span>
+                    </n-text>
+                    <AllArtists
+                      v-else
+                      key="artists"
+                      class="text-hidden"
+                      :artistsData="music.getPlaySongData.artist"
+                    />
+                  </Transition>
+                </template>
+                <template v-else>
+                  <AllArtists class="text-hidden" :artistsData="music.getPlaySongData.artist" />
+                </template>
               </Transition>
             </div>
           </div>
@@ -316,7 +309,6 @@ import { debounce, throttle } from "throttle-debounce";
 import { useI18n } from "vue-i18n";
 import { isTauri } from "@/utils/tauri";
 import { windowManager } from "@/utils/tauri/windowManager";
-import { useAndroidMediaSession } from "@/composables/useAndroidMediaSession";
 import VueSlider from "vue-slider-component";
 import AddPlaylist from "@/components/DataModal/AddPlaylist.vue";
 import PlayListDrawer from "@/components/DataModal/PlayListDrawer.vue";
@@ -334,15 +326,11 @@ const { t } = useI18n();
 const router = useRouter();
 const setting = settingStore();
 const music = musicStore();
-
-// Android: media notification + lock-screen / hardware-key control bridge.
-// Self-contained: sets up its own watchers, lifecycle hooks, and event listener.
-// No-op on desktop and browser builds (checked internally via isTauri + isMobile).
-useAndroidMediaSession();
 const listenTogether = listenTogetherStore();
 const { persistData } = storeToRefs(music);
 const addPlayListRef = ref(null);
 const PlayListDrawerRef = ref(null);
+const lrcScrollRef = ref(null);
 
 // 一起听歌模态框
 const showListenTogetherModal = ref(false);
@@ -358,9 +346,6 @@ let _songLoadGeneration = 0;
 // 获取歌曲播放数据
 const getPlaySongData = async (data, level = setting.songLevel) => {
   const generation = ++_songLoadGeneration;
-  // Signal that we're in the URL-resolution phase so the UI can show a
-  // meaningful status rather than a generic spinner.
-  music.loadingStage = "resolving";
   try {
     if (!data || !data.id) {
       console.error("[Player] getPlaySongData called with invalid data:", data);
@@ -412,8 +397,6 @@ const getPlaySongData = async (data, level = setting.songLevel) => {
     // 获取歌词
     fetchAndParseLyric(id);
   } catch (err) {
-    music.isLoadingSong = false;
-    music.loadingStage = "idle";
     if (generation !== _songLoadGeneration) return;
     console.error("[Player] Error in getPlaySongData:", err);
     if (music.getPlaylists[0] && music.getPlayState) {
@@ -435,16 +418,6 @@ const renderIcon = (icon) => {
     );
   };
 };
-
-// Human-readable loading stage text shown in the bottom bar subtitle area.
-const loadingStageText = computed(() => {
-  const stage = music.getLoadingStage;
-  if (stage === "resolving") return t("player.loading.resolving");
-  if (stage === "buffering") return t("player.loading.buffering");
-  if (stage === "stalled") return t("player.loading.stalled");
-  if (stage === "error") return t("player.loading.error");
-  return t("player.loading.loading");
-});
 
 // 歌曲进度条更新
 const sliderDragEnd = () => {
@@ -1029,6 +1002,119 @@ const fetchAndParseLyric = async (id) => {
     music.setPlaySongLyric(defaultResult);
   }
 };
+
+// 歌词滚动逻辑：按播放进度水平滚动，避免挤占其他布局区域
+// 借鉴 DesktopLyrics 的实现：.lrc-scroll-content 作为 inline-block 在 .lrc 容器内滚动
+const lrcScrollStyle = ref({});
+
+const updateLrcScroll = () => {
+  const scrollEl = lrcScrollRef.value;
+  if (!scrollEl) return;
+
+  // scrollEl 是 .lrc-scroll-content，它的父元素是 .lrc (n-text)
+  const containerEl = scrollEl.parentElement;
+  if (!containerEl) return;
+
+  const containerWidth = containerEl.clientWidth;
+  const scrollWidth = scrollEl.scrollWidth;
+
+  // 如果内容没有溢出，不需要滚动
+  if (scrollWidth <= containerWidth) {
+    lrcScrollStyle.value = {};
+    return;
+  }
+
+  const lyric = music.getPlaySongLyric;
+  const index = music.getPlaySongLyricIndex;
+  const currentTime = music.getPlaySongTime.currentTime;
+
+  if (!lyric || index === -1) return;
+
+  let progress = 0;
+
+  // YRC 逐字歌词：按当前字的时间进度计算
+  if (setting.showYrc && lyric.hasYrc && lyric.yrc?.[index]?.content?.length) {
+    const yrcLine = lyric.yrc[index];
+    const words = yrcLine.content;
+    const lineStart = yrcLine.time;
+    const lineEnd = yrcLine.endTime || words[words.length - 1]?.endTime || lineStart + 5;
+    const lineDuration = lineEnd - lineStart;
+
+    if (lineDuration > 0) {
+      // 找到当前正在播放的字，计算累计进度
+      for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        if (currentTime >= w.endTime) {
+          // 这个字已播完
+          progress = (w.endTime - lineStart) / lineDuration;
+        } else if (currentTime >= w.time && currentTime < w.endTime) {
+          // 当前正在播放这个字
+          const wordElapsed = currentTime - w.time;
+          const wordProgress = w.duration > 0 ? wordElapsed / w.duration : 1;
+          progress = (w.time - lineStart + wordProgress * (w.endTime - w.time)) / lineDuration;
+          break;
+        }
+      }
+      progress = Math.min(1, Math.max(0, progress));
+    }
+  } else if (lyric.lrc?.[index]) {
+    // 普通 LRC：按行内时间进度计算
+    const lrcLine = lyric.lrc[index];
+    const lineStart = lrcLine.time;
+    // 尝试获取下一行的时间作为结束时间
+    const nextLine = lyric.lrc[index + 1];
+    const lineEnd = nextLine ? nextLine.time : lineStart + 5;
+    const lineDuration = lineEnd - lineStart;
+
+    if (lineDuration > 0) {
+      progress = Math.min(1, Math.max(0, (currentTime - lineStart) / lineDuration));
+    }
+  }
+
+  // 计算滚动偏移：总溢出宽度 * 进度
+  // 起始停顿：前 30% 进度保持不滚动，让文字在开头停留一段时间
+  const scrollStartProgress = 0.3;
+  let scrollProgress = 0;
+  if (progress > scrollStartProgress) {
+    scrollProgress = (progress - scrollStartProgress) / (1 - scrollStartProgress);
+  }
+  scrollProgress = Math.min(1, Math.max(0, scrollProgress));
+
+  const overflow = scrollWidth - containerWidth;
+  const offset = overflow * scrollProgress;
+
+  lrcScrollStyle.value = {
+    transform: `translateX(-${offset}px)`,
+    transition: "transform 0.1s linear",
+  };
+};
+
+// 监听歌词索引变化，重置滚动位置
+watch(
+  () => music.getPlaySongLyricIndex,
+  () => {
+    lrcScrollStyle.value = {};
+    nextTick(() => {
+      updateLrcScroll();
+    });
+  },
+);
+
+// 监听播放时间变化，更新歌词滚动
+watch(
+  () => music.getPlaySongTime.currentTime,
+  () => {
+    updateLrcScroll();
+  },
+);
+
+// 监听播放时间变化，更新歌词滚动
+watch(
+  () => music.getPlaySongTime.currentTime,
+  () => {
+    updateLrcScroll();
+  },
+);
 </script>
 
 <style lang="scss" scoped>
@@ -1045,7 +1131,7 @@ const fetchAndParseLyric = async (id) => {
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fade-enter-from,
@@ -1070,11 +1156,9 @@ const fetchAndParseLyric = async (id) => {
   backdrop-filter: blur(20px) saturate(180%);
   border-top: 1px solid var(--acrylic-border, rgba(0, 0, 0, 0.04));
 
-  // Mobile: player sits above tab bar, no sidebar.
-  // --app-safe-area-bottom is env(safe-area-inset-bottom) on Tauri mobile,
-  // 0px everywhere else — so this calc is a no-op on desktop.
+  // Mobile: player sits above tab bar, no sidebar
   @media (max-width: 768px) {
-    bottom: calc(56px + var(--app-safe-area-bottom, 0px));
+    bottom: 56px;
     left: 0;
     width: 100%;
   }
@@ -1156,6 +1240,8 @@ const fetchAndParseLyric = async (id) => {
       display: flex;
       flex-direction: row;
       align-items: center;
+      min-width: 0;
+      overflow: hidden;
 
       .pic {
         width: 50px;
@@ -1202,6 +1288,9 @@ const fetchAndParseLyric = async (id) => {
       }
 
       .name {
+        min-width: 0;
+        overflow: hidden;
+
         .song {
           font-size: 16px;
           font-weight: bold;
@@ -1216,31 +1305,24 @@ const fetchAndParseLyric = async (id) => {
         .artisrOrLrc {
           font-size: 12px;
           margin-top: 2px;
+          overflow: hidden;
 
-          .loading-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            color: var(--n-text-color-3, #aaa);
-            font-size: 11px;
-            letter-spacing: 0.02em;
+          .lrc {
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
 
-            // Animated ellipsis to show live activity
-            &::after {
-              content: "";
+            .lrc-scroll-content {
               display: inline-block;
-              width: 3px;
-              height: 3px;
-              border-radius: 50%;
-              background: currentColor;
-              animation: loading-dot-pulse 1.2s ease-in-out infinite;
+              white-space: nowrap;
+              transition: transform 0.1s linear;
+              will-change: transform;
+            }
+
+            .lrc-word {
+              display: inline;
             }
           }
-        }
-
-        @keyframes loading-dot-pulse {
-          0%, 100% { opacity: 0.3; transform: scale(0.8); }
-          50%       { opacity: 1;   transform: scale(1.2); }
         }
       }
     }

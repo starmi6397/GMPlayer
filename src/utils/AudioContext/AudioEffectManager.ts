@@ -227,7 +227,7 @@ export class AudioEffectManager {
   getFrequencyData(force: boolean = false): Uint8Array<ArrayBuffer> {
     const buffer = this._frequencyBuffer;
     const analyser = this.analyserNode;
-    if (!analyser || !buffer) return (EMPTY_U8 as Uint8Array<ArrayBuffer>);
+    if (!analyser || !buffer) return EMPTY_U8 as Uint8Array<ArrayBuffer>;
 
     const now = performance.now();
     if (!force && now - this._lastUpdateTime < this.options.minUpdateInterval) {

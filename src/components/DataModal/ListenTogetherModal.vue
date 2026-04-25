@@ -149,13 +149,7 @@
               <div class="room-id-row">
                 <span class="room-id-label">{{ t("other.listenTogether.roomId") }}</span>
                 <code class="room-id-code">{{ listenTogether.roomId }}</code>
-                <n-button
-                  text
-                  size="tiny"
-                  :focusable="false"
-                  class="icon-btn"
-                  @click="copyRoomId"
-                >
+                <n-button text size="tiny" :focusable="false" class="icon-btn" @click="copyRoomId">
                   <template #icon>
                     <n-icon :component="CopyOutline" size="14" />
                   </template>
@@ -181,10 +175,7 @@
           <!-- ─── Sync status bar ─────────────────────────── -->
           <!-- Always visible for guests; visible for hosts only on error -->
           <Transition name="lt-slide">
-            <div
-              v-if="showSyncBar"
-              :class="['sync-bar', `sync-bar--${listenTogether.syncStatus}`]"
-            >
+            <div v-if="showSyncBar" :class="['sync-bar', `sync-bar--${listenTogether.syncStatus}`]">
               <span class="sync-dot" />
               <span class="sync-label">{{ syncStatusText }}</span>
             </div>
@@ -258,13 +249,7 @@
                   <span class="avatar-letter">{{ firstLetter(user.nickname) }}</span>
                 </div>
                 <span class="user-nickname text-hidden">{{ user.nickname }}</span>
-                <n-tag
-                  v-if="isSelf(user.userId)"
-                  size="tiny"
-                  type="info"
-                  :bordered="false"
-                  round
-                >
+                <n-tag v-if="isSelf(user.userId)" size="tiny" type="info" :bordered="false" round>
                   {{ t("other.listenTogether.me") }}
                 </n-tag>
               </div>
@@ -304,10 +289,7 @@
               </div>
               <div class="np-info">
                 <div class="np-name text-hidden">{{ musicStore.getPlaySongData.name }}</div>
-                <AllArtists
-                  :artistsData="musicStore.getPlaySongData.artist"
-                  class="np-artists"
-                />
+                <AllArtists :artistsData="musicStore.getPlaySongData.artist" class="np-artists" />
               </div>
             </div>
           </div>
@@ -386,9 +368,7 @@ const isLoading = ref(false);
 
 // ── Sync status ────────────────────────────────────────────────────────────
 /** Show the sync bar for guests always, for hosts only when there's an error. */
-const showSyncBar = computed(
-  () => listenTogether.isGuest || listenTogether.syncStatus === "error",
-);
+const showSyncBar = computed(() => listenTogether.isGuest || listenTogether.syncStatus === "error");
 
 const syncStatusText = computed(() => {
   switch (listenTogether.syncStatus) {

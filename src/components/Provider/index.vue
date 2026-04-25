@@ -20,8 +20,8 @@
     <n-global-style />
     <n-loading-bar-provider>
       <n-dialog-provider>
-        <n-notification-provider>
-          <n-message-provider :max="3" :duration="2000">
+        <n-notification-provider :placement="isMobile ? 'top' : 'top-right'">
+          <n-message-provider :max="3" :duration="2000" :placement="isMobile ? 'top' : 'top'">
             <slot></slot>
             <NaiveProviderContent />
           </n-message-provider>
@@ -46,6 +46,14 @@ import { settingStore } from "@/store";
 import themeColorData from "./themeColor.json";
 
 const setting = settingStore();
+
+// 检测是否为移动端（宽度小于768px或存在触摸设备特征）
+const isMobile = ref(false);
+const checkMobile = () => {
+  isMobile.value = window.innerWidth < 768 || "ontouchstart" in window;
+};
+checkMobile();
+window.addEventListener("resize", checkMobile);
 const osThemeRef = useOsTheme();
 const themeOverrides = ref(null);
 
