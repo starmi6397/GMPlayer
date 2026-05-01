@@ -19,7 +19,11 @@
       >
         <template v-if="!isLocked">
           <div class="header-left">
-            <span class="song-name" :title="state.title" :data-tauri-drag-region="!isLocked || undefined">
+            <span
+              class="song-name"
+              :title="state.title"
+              :data-tauri-drag-region="!isLocked || undefined"
+            >
               {{ state.title || $t("desktopLyrics.noLyrics") }}
             </span>
           </div>
@@ -136,28 +140,37 @@
     </Transition>
 
     <!-- Lyric content -->
-    <div class="lyric-area">
-      <TransitionGroup v-if="hasLyrics" name="lyric-slide" tag="div" class="lyric-container">
+    <div class="lyric-area" :class="{ 'no-animation': !animationsEnabled }">
+      <TransitionGroup
+        v-if="displayState === 'hasLyrics'"
+        :name="animationsEnabled ? 'lyric-slide' : ''"
+        tag="div"
+        class="lyric-container"
+        :class="positionClass"
+      >
         <div
-          v-for="line in visibleLines"
+          v-for="line in renderLyricLines"
           :key="line.key"
           class="lyric-line"
-          :class="{ current: line.isCurrent }"
+          :class="{ current: line.isCurrent, title: line.isTitle }"
           @click="seekToLine(line)"
         >
           <div class="lyric-inner" :style="lyricTextStyle">
-            <template v-if="line.isCurrent && line.words.length > 1">
-              <span
-                v-for="(word, wi) in line.words"
-                :key="wi"
-                class="lyric-word"
-                :style="getWordStyle(word)"
-                >{{ word.word }}</span
-              >
+            <template v-if="line.isCurrent && line.words.length > 1 && bridge.settings.showYrc">
+              <span v-for="(word, wi) in line.words" :key="wi" class="lyric-word">
+                <span class="word-bg">{{ word.word }}</span>
+                <span class="word-fill" :style="getWordStyle(word)">{{ word.word }}</span>
+              </span>
             </template>
-            <span v-else class="lyric-text" :class="{ current: line.isCurrent }">{{
-              line.text
-            }}</span>
+            <template v-else>
+              <span
+                class="scroll-content"
+                :ref="setContentRef(line.key)"
+                :style="getScrollStyle(line)"
+              >
+                <span class="lyric-text" :class="{ current: line.isCurrent }">{{ line.text }}</span>
+              </span>
+            </template>
           </div>
           <div
             v-if="line.translatedLyric && bridge.settings.showTransl"
@@ -166,8 +179,18 @@
           >
             {{ line.translatedLyric }}
           </div>
+          <div
+            v-if="line.romanLyric && bridge.settings.showRoma"
+            class="lyric-tran lyric-roma"
+            :style="tranStyle"
+          >
+            {{ line.romanLyric }}
+          </div>
         </div>
       </TransitionGroup>
+      <div v-else-if="displayState === 'noLyrics'" class="no-lyrics" :style="lyricTextStyle">
+        <span class="song-title">{{ $t("desktopLyrics.pureMusic") }}</span>
+      </div>
       <div v-else class="no-lyrics" :style="lyricTextStyle">
         <span class="song-title">{{ state.title || $t("desktopLyrics.noLyrics") }}</span>
         <span v-if="state.artist" class="artist-name">{{ state.artist }}</span>
@@ -177,13 +200,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, shallowRef, onMounted, onUnmounted } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  shallowRef,
+  onMounted,
+  onUnmounted,
+  type ComponentPublicInstance,
+} from "vue";
 import { usePlayerBridge } from "@/utils/tauri/playerBridge";
 import { windowManager } from "@/utils/tauri/windowManager";
 import type { AMLLLine, AMLLWord } from "@/utils/LyricsProcessor";
 
 const bridge = usePlayerBridge();
 const { state } = bridge;
+
+// ── Constants ─────────────────────────────────────────────────────────
+
+/** YRC word animations start this many ms early for perceived responsiveness */
+const LYRIC_LOOKAHEAD = 300;
 
 // ── Lyric Data ────────────────────────────────────────────────────────
 
@@ -204,6 +240,14 @@ watch(
   },
   { immediate: true },
 );
+
+/** Falls back to next line's startTime when endTime is invalid */
+function getSafeEndTime(lines: AMLLLine[], idx: number): number {
+  const line = lines[idx];
+  if (line.endTime > line.startTime) return line.endTime;
+  if (idx + 1 < lines.length) return lines[idx + 1].startTime;
+  return line.startTime + 5000;
+}
 
 // ── Time Interpolation (RAF + performance.now anchor) ─────────────────
 
@@ -266,46 +310,78 @@ interface VisibleLine {
   words: AMLLWord[];
   text: string;
   translatedLyric: string;
+  romanLyric: string;
   lineStartTime: number;
   lineEndTime: number;
+  lineIndex: number;
+  isTitle: boolean;
 }
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
-const visibleLines = computed<VisibleLine[]>(() => {
+const renderLyricLines = computed<VisibleLine[]>(() => {
   const lines = amllLines.value;
   if (!lines || lines.length === 0) return [];
   const idx = currentLineIndex.value;
   const gen = songGeneration.value;
   const result: VisibleLine[] = [];
 
-  if (idx >= 0 && idx < lines.length) {
+  // Before first lyric line: show song title + artist as placeholder
+  if (idx < 0) {
+    result.push({
+      key: `${gen}-title`,
+      isCurrent: true,
+      words: [],
+      text: state.title || "",
+      translatedLyric: state.artist || "",
+      romanLyric: "",
+      lineStartTime: 0,
+      lineEndTime: lines[0]?.startTime ?? 0,
+      lineIndex: -1,
+      isTitle: true,
+    });
+    return result;
+  }
+
+  // Current line
+  if (idx < lines.length) {
     const line = lines[idx];
+    const endTime = getSafeEndTime(lines, idx);
     result.push({
       key: `${gen}-${idx}`,
       isCurrent: true,
       words: line.words,
       text: line.words.map((w) => w.word).join(""),
       translatedLyric: line.translatedLyric || "",
+      romanLyric: line.romanLyric || "",
       lineStartTime: line.startTime,
-      lineEndTime: line.endTime,
+      lineEndTime: endTime,
+      lineIndex: idx,
+      isTitle: false,
     });
   }
 
-  const nextIdx = Math.max(0, idx + 1);
-  if (nextIdx < lines.length && result.length < 2) {
-    const line = lines[nextIdx];
-    result.push({
-      key: `${gen}-${nextIdx}`,
-      isCurrent: false,
-      words: line.words,
-      text: line.words.map((w) => w.word).join(""),
-      translatedLyric: line.translatedLyric || "",
-      lineStartTime: line.startTime,
-      lineEndTime: line.endTime,
-    });
+  // Next line (double-line mode: only when translation is off)
+  if (!bridge.settings.showTransl) {
+    const nextIdx = idx + 1;
+    if (nextIdx < lines.length && result.length < 2) {
+      const line = lines[nextIdx];
+      const endTime = getSafeEndTime(lines, nextIdx);
+      result.push({
+        key: `${gen}-${nextIdx}`,
+        isCurrent: false,
+        words: line.words,
+        text: line.words.map((w) => w.word).join(""),
+        translatedLyric: line.translatedLyric || "",
+        romanLyric: line.romanLyric || "",
+        lineStartTime: line.startTime,
+        lineEndTime: endTime,
+        lineIndex: nextIdx,
+        isTitle: false,
+      });
+    }
   }
 
   return result;
@@ -315,10 +391,14 @@ const visibleLines = computed<VisibleLine[]>(() => {
 
 function getWordStyle(word: AMLLWord) {
   const duration = word.endTime - word.startTime;
-  if (duration <= 0) return {};
-  const progress = clamp((interpolatedTimeMs.value - word.startTime) / duration, 0, 1);
+  if (duration <= 0) return { clipPath: "inset(0 0% 0 0)" };
+  const progress = clamp(
+    (interpolatedTimeMs.value - word.startTime + LYRIC_LOOKAHEAD) / duration,
+    0,
+    1,
+  );
   return {
-    backgroundPosition: `${(1 - progress) * 100}% 0`,
+    clipPath: `inset(0 ${(1 - progress) * 100}% 0 0)`,
   };
 }
 
@@ -362,6 +442,80 @@ const lyricTextStyle = computed(() => ({
 const tranStyle = computed(() => ({
   fontSize: `${Math.max(14, Math.round(localFontSize.value * 0.45))}px`,
 }));
+
+// ── Lyric Position / Alignment ────────────────────────────────────────
+
+const positionClass = computed(() => {
+  const pos = bridge.settings.lyricsPosition;
+  if (pos === "left") return "pos-left";
+  if (pos === "right") return "pos-right";
+  return "pos-center";
+});
+
+// ── Animation Toggle ──────────────────────────────────────────────────
+
+const animationsEnabled = computed(() => bridge.settings.showYrcAnimation !== false);
+
+// ── Display State ─────────────────────────────────────────────────────
+
+const displayState = computed(() => {
+  if (state.isLoading) return "loading";
+  if (hasLyrics.value) return "hasLyrics";
+  return "noLyrics";
+});
+
+// ── Horizontal Scroll for Long Lyrics ─────────────────────────────────
+
+const contentRefs = new Map<string, HTMLElement>();
+
+function setContentRef(key: string) {
+  return (el: Element | ComponentPublicInstance | null) => {
+    if (el instanceof HTMLElement) {
+      contentRefs.set(key, el);
+    } else {
+      contentRefs.delete(key);
+    }
+  };
+}
+
+function getScrollStyle(line: VisibleLine) {
+  if (!line.isCurrent) return {};
+  const el = contentRefs.get(line.key);
+  if (!el) return {};
+  // Walk up to .lyric-line (the block-level clipping container)
+  // since .lyric-inner is display:inline and has no measurable clientWidth
+  const container = el.closest(".lyric-line") as HTMLElement | null;
+  if (!container) return {};
+  const overflow = el.scrollWidth - container.clientWidth;
+  if (overflow <= 0) return {};
+
+  const lineDuration = line.lineEndTime - line.lineStartTime;
+  if (lineDuration <= 0) return {};
+
+  const lineProgress = clamp((interpolatedTimeMs.value - line.lineStartTime) / lineDuration, 0, 1);
+
+  // Start scrolling at 30% progress, finish 2s before line end
+  const scrollStartProgress = 0.3;
+  const scrollEndMs = Math.max(line.lineStartTime, line.lineEndTime - 2000);
+  const scrollEndProgress = clamp(
+    (scrollEndMs - line.lineStartTime) / lineDuration,
+    scrollStartProgress + 0.01,
+    1,
+  );
+
+  if (lineProgress < scrollStartProgress) return {};
+
+  const scrollProgress = clamp(
+    (lineProgress - scrollStartProgress) / (scrollEndProgress - scrollStartProgress),
+    0,
+    1,
+  );
+
+  return {
+    transform: `translateX(${-overflow * scrollProgress}px)`,
+    transition: "transform 0.1s linear",
+  };
+}
 
 // ── Drag Attrs (disabled when locked) ─────────────────────────────────
 
@@ -498,7 +652,7 @@ function stopCursorPolling() {
 // ── Seek on Line Click ────────────────────────────────────────────────
 
 function seekToLine(line: VisibleLine) {
-  if (isLocked.value) return;
+  if (isLocked.value || line.isTitle) return;
   bridge.seek(line.lineStartTime / 1000);
 }
 
@@ -738,16 +892,46 @@ onUnmounted(() => {
 .lyric-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
   width: 100%;
   position: relative;
+
+  &.pos-left {
+    align-items: flex-start;
+
+    .lyric-line {
+      text-align: left;
+    }
+
+    .lyric-tran {
+      text-align: left;
+    }
+  }
+
+  &.pos-center {
+    align-items: center;
+
+    .lyric-line {
+      text-align: center;
+    }
+  }
+
+  &.pos-right {
+    align-items: flex-end;
+
+    .lyric-line {
+      text-align: right;
+    }
+
+    .lyric-tran {
+      text-align: right;
+    }
+  }
 }
 
 // ── Lyric line ────────────────────────────────────────────────────────
 .lyric-line {
   pointer-events: auto;
-  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   max-width: 100%;
@@ -757,6 +941,11 @@ onUnmounted(() => {
 
   &.current {
     opacity: 1;
+  }
+
+  &.title {
+    cursor: default;
+    pointer-events: none;
   }
 
   &:not(.current) {
@@ -782,24 +971,33 @@ onUnmounted(() => {
     0 0 20px rgba(0, 0, 0, 0.4);
 }
 
-// ── YRC Word gradient ─────────────────────────────────────────────────
+// Horizontal scroll wrapper for long lyrics
+.scroll-content {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+// ── YRC Word dual-layer ──────────────────────────────────────────────
+// Inactive layer (.word-bg) shows full text in dim color with inherited text-shadow outline.
+// Active layer (.word-fill) overlays bright text, clipped by playback progress.
 .lyric-word {
-  display: inline;
-  background: linear-gradient(
-    to right,
-    var(--active-color, rgb(255, 255, 255)) 50%,
-    var(--inactive-color, rgba(255, 255, 255, 0.35)) 50%
-  );
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  // text-shadow doesn't work with background-clip:text in WebKit,
-  // so use -webkit-text-stroke for the outline
-  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.5);
-  paint-order: stroke fill;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  position: relative;
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+.word-bg {
+  color: var(--inactive-color, rgba(255, 255, 255, 0.35));
+}
+
+.word-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--active-color, rgb(255, 255, 255));
+  text-shadow: none;
+  will-change: clip-path;
+  pointer-events: none;
 }
 
 // Plain text (non-YRC or next line)
@@ -830,6 +1028,11 @@ onUnmounted(() => {
     sans-serif;
 }
 
+// Romanization line
+.lyric-roma {
+  font-style: italic;
+}
+
 // ── Lyric line transitions ────────────────────────────────────────────
 .lyric-slide-enter-active,
 .lyric-slide-leave-active {
@@ -853,6 +1056,19 @@ onUnmounted(() => {
 // Leaving elements need absolute positioning for FLIP animation
 .lyric-slide-leave-active {
   position: absolute;
+  width: 100%;
+}
+
+// ── No animation mode ────────────────────────────────────────────────
+.no-animation {
+  .lyric-line,
+  .lyric-inner,
+  .lyric-word,
+  .word-fill,
+  .lyric-text,
+  .lyric-tran {
+    transition: none !important;
+  }
 }
 
 // ── No lyrics state ───────────────────────────────────────────────────

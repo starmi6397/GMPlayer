@@ -29,7 +29,7 @@
     />
   </template>
 
-  <div :class="grayClasses" />
+  <div :class="grayClasses" :style="grayStyles" />
 </template>
 
 <script setup lang="ts">
@@ -61,8 +61,22 @@ const isEplorOrBlurMode = computed(
 const grayClasses = computed(() => {
   const classes: string[] = ["gray"];
   if (props.backgroundImageShow === "blur") classes.push("blur");
-  if (isEplorOrBlurMode.value) classes.push("no-backdrop");
   return classes;
+});
+
+const grayStyles = computed(() => {
+  if (isEplorOrBlurMode.value) {
+    return {
+      backgroundColor: "transparent",
+    };
+  }
+  const bgColor = props.backgroundImageShow === "blur" ? "#00000060" : "#00000030";
+  return {
+    backgroundColor: bgColor,
+    WebkitBackdropFilter: "blur(80px)",
+    backdropFilter: "blur(80px)",
+    transition: "backdrop-filter 0.5s ease, background-color 0.5s ease",
+  };
 });
 </script>
 
@@ -135,25 +149,7 @@ const grayClasses = computed(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: #00000030;
-  -webkit-backdrop-filter: blur(80px);
-  backdrop-filter: blur(80px);
   z-index: -1;
-  transition:
-    backdrop-filter 0.5s ease,
-    background-color 0.5s ease;
-
-  &.blur {
-    background-color: #00000060;
-  }
-
-  // eplor/blur mode: disable backdrop
-  &.no-backdrop {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    transition: none !important;
-    background-color: transparent !important;
-  }
 }
 
 .fade-enter-active,

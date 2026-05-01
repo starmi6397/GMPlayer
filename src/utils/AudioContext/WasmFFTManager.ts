@@ -164,21 +164,37 @@ export class WasmFFTManager {
     }
 
     const rawLen = this._readBuffer.length; // 2048
-    const binsPerGroup = rawLen / 128; // ~16 bins per AMLL-equivalent bin
+    const binsPerGroup = rawLen / 128; // 16 for FFTPlayer's 2048 output
 
     if (count !== this._cachedRawBinsCount) {
-      this._cachedRawBins = new Array(count).fill(0);
+      this._cachedRawBins = Array.from({ length: count }, () => 0);
       this._cachedRawBinsCount = count;
     }
 
-    for (let i = 0; i < count; i++) {
-      const start = Math.floor(i * binsPerGroup);
-      const end = Math.floor((i + 1) * binsPerGroup);
-      let sum = 0;
-      for (let j = start; j < end; j++) {
-        sum += this._readBuffer[j];
+    // Fast path: FFTPlayer output is 2048 bins, which is exactly divisible by 128.
+    // Preserve exact averaging behavior while avoiding Math.floor in hot loops.
+    if ((rawLen & 127) === 0) {
+      const groupSize = rawLen >> 7; // rawLen / 128
+      for (let i = 0; i < count; i++) {
+        const start = i * groupSize;
+        const end = start + groupSize;
+        let sum = 0;
+        for (let j = start; j < end; j++) {
+          sum += this._readBuffer[j];
+        }
+        this._cachedRawBins[i] = sum / groupSize;
       }
-      this._cachedRawBins[i] = sum / (end - start);
+    } else {
+      // Fallback: keep the original floor-based grouping for unexpected buffer sizes.
+      for (let i = 0; i < count; i++) {
+        const start = Math.floor(i * binsPerGroup);
+        const end = Math.floor((i + 1) * binsPerGroup);
+        let sum = 0;
+        for (let j = start; j < end; j++) {
+          sum += this._readBuffer[j];
+        }
+        this._cachedRawBins[i] = sum / (end - start);
+      }
     }
 
     this._rawBinsDirty = false;

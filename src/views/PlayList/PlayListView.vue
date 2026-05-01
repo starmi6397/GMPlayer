@@ -7,7 +7,7 @@
           class="coverImg"
           :src="getCoverUrl(playListDetail.coverImgUrl, 1024)"
           :previewed-img-props="{ style: { borderRadius: '8px' } }"
-          :preview-src="getCoverUrl(playListDetail.coverImgUrl)"
+          :preview-src="getCoverUrl(playListDetail.coverImgUrl, 512)"
           fallback-src="/images/pic/default.png"
         />
         <n-image

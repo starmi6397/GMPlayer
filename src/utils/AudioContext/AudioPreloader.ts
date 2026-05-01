@@ -11,16 +11,13 @@
  */
 
 import { BufferedSound } from "./BufferedSound";
-import { getMusicUrl, getMusicNumUrl } from "@/api/song";
+import { resolveSongUrl } from "./resolveSongUrl";
 import { getAutoMixEngine } from "./AutoMix";
-// Import stores directly to avoid circular dependency through barrel exports
+// Import store directly to avoid circular dependency through barrel exports
 import useMusicDataStore from "@/store/musicData";
-import useSettingDataStore from "@/store/settingData";
-import { MusicLevel } from "@/api/types";
 
 // Lazy store access (called at runtime, not import time)
 const musicStore = () => useMusicDataStore();
-const settingStore = () => useSettingDataStore();
 
 interface PreloadedEntry {
   songId: number;
@@ -30,7 +27,6 @@ interface PreloadedEntry {
 }
 
 const IS_DEV = import.meta.env?.DEV ?? false;
-const useUnmServerHas = !!import.meta.env.VITE_UNM_API;
 
 export class AudioPreloader {
   private _entry: PreloadedEntry | null = null;
@@ -40,7 +36,6 @@ export class AudioPreloader {
   /** Called when current song starts playing — preloads the next song */
   preloadNext(): void {
     const music = musicStore();
-    const setting = settingStore();
 
     // Guard: only normal mode, not FM, list >= 2, not already preloading
     if (music.persistData.personalFmMode) return;
@@ -72,19 +67,6 @@ export class AudioPreloader {
       return;
     }
 
-    // Guard: VIP song with UNM enabled — UNM uses different source
-    if (
-      useUnmServerHas &&
-      setting.useUnmServer &&
-      !nextSong.pc &&
-      (nextSong.fee === 1 || nextSong.fee === 4)
-    ) {
-      if (IS_DEV) {
-        console.log(`[AudioPreloader] Skipping VIP song with UNM: ${nextSong.name}`);
-      }
-      return;
-    }
-
     // Clean up any previous entry before starting new preload
     this.cleanup();
 
@@ -98,71 +80,28 @@ export class AudioPreloader {
       );
     }
 
-    const level = setting.songLevel || "exhigh";
-
-    this._resolveAndPreload(nextSong, nextIndex, level, abortSignal);
+    this._resolveAndPreload(nextSong, nextIndex, abortSignal);
   }
 
-  /** Resolve music URL (with trial detection + UNM fallback) and create BufferedSound */
+  /** Resolve music URL and create BufferedSound */
   private async _resolveAndPreload(
     nextSong: any,
     nextIndex: number,
-    level: string,
     abortSignal: AbortSignal,
   ): Promise<void> {
     try {
-      // Step 1: Resolve URL (with trial version detection + UNM fallback)
-      let url: string | null = null;
-
-      try {
-        const res = await getMusicUrl(nextSong.id, level as MusicLevel);
-        if (abortSignal.aborted) return;
-
-        const rawUrl = res?.data?.[0]?.url;
-        if (rawUrl) {
-          url = rawUrl.replace(/^http:/, "https:");
-          // Check for trial version (jd-musicrep-ts) - needs UNM replacement
-          if (url.includes("jd-musicrep-ts") && useUnmServerHas) {
-            if (IS_DEV) {
-              console.log(`[AudioPreloader] ${nextSong.name} is trial version, trying UNM`);
-            }
-            url = null; // Force UNM fallback
-          }
-        }
-      } catch (err) {
-        if (IS_DEV) {
-          console.warn(`[AudioPreloader] getMusicUrl failed for ${nextSong.name}:`, err);
-        }
-        url = null;
-      }
-
+      // Step 1: Resolve URL (unified: NCM + trial detection + UNM fallback + kuwo proxy)
+      const result = await resolveSongUrl(nextSong, undefined, { signal: abortSignal });
       if (abortSignal.aborted) return;
 
-      // UNM fallback: if no URL or trial version detected
-      if (!url && useUnmServerHas) {
-        try {
-          const unmRes = await getMusicNumUrl(nextSong.id);
-          if (abortSignal.aborted) return;
-          if (unmRes?.code === 200 && unmRes?.data?.url) {
-            url = unmRes.data.url.replace(/^http:/, "https:");
-            if (IS_DEV) {
-              console.log(`[AudioPreloader] Got UNM URL for ${nextSong.name}`);
-            }
-          }
-        } catch (unmErr) {
-          if (IS_DEV) {
-            console.warn(`[AudioPreloader] UNM fallback failed for ${nextSong.name}:`, unmErr);
-          }
-        }
-      }
-
-      if (!url || abortSignal.aborted) {
-        if (IS_DEV && !url) {
+      if (!result) {
+        if (IS_DEV) {
           console.warn(`[AudioPreloader] No URL resolved for: ${nextSong.name}`);
         }
         this._isPreloading = false;
         return;
       }
+      const url = result.url;
 
       // Step 2: Create BufferedSound with volume=0 (will be set to real volume on consume)
       const sound = new BufferedSound({

@@ -3,9 +3,9 @@ use serde_json::Value;
 use tauri::{command, AppHandle, Manager};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
-use crate::window::config::WindowConfig;
-use crate::window::manager;
-use crate::window::payload::PayloadCache;
+use crate::desktop::window::config::WindowConfig;
+use crate::desktop::window::manager;
+use crate::desktop::window::payload::PayloadCache;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -199,8 +199,7 @@ pub fn get_cursor_position() -> Result<(i32, i32), String> {
         use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
         let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState)
             .map_err(|_| "Failed to create CGEventSource".to_string())?;
-        let event = CGEvent::new(source)
-            .map_err(|_| "Failed to create CGEvent".to_string())?;
+        let event = CGEvent::new(source).map_err(|_| "Failed to create CGEvent".to_string())?;
         let loc = event.location();
         Ok((loc.x as i32, loc.y as i32))
     }

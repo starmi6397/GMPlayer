@@ -24,6 +24,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { musicStore, settingStore } from "@/store";
 import { isTauri } from "@/utils/tauri/windowManager";
+import { isMobile } from "@/utils/tauri";
 import { useOsTheme } from "naive-ui";
 
 const music = musicStore();
@@ -69,6 +70,7 @@ async function checkMaximized() {
 
 onMounted(async () => {
   if (!isTauri()) return;
+  if (await isMobile()) return;
 
   // Don't show custom titlebar on macOS (traffic lights handle it)
   const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;

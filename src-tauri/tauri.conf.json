@@ -8,7 +8,7 @@
   },
   "bundle": {
     "active": true,
-    "category": "DeveloperTool",
+    "category": "Music",
     "copyright": "",
     "targets": "all",
     "externalBin": [],
@@ -19,7 +19,17 @@
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
-      "timestampUrl": ""
+      "timestampUrl": "",
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "displayLanguageSelector": true
+      },
+      "wix": {
+        "language": ["zh-CN", "en-US"]
+      }
+
     },
     "longDescription": "",
     "macOS": {

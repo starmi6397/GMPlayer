@@ -20,8 +20,8 @@
     <n-global-style />
     <n-loading-bar-provider>
       <n-dialog-provider>
-        <n-notification-provider>
-          <n-message-provider :max="3" :duration="2000">
+        <n-notification-provider :placement="isMobile ? 'top' : 'top-right'">
+          <n-message-provider :max="3" :duration="2000" :placement="isMobile ? 'top' : 'top'">
             <slot></slot>
             <NaiveProviderContent />
           </n-message-provider>
@@ -46,6 +46,14 @@ import { settingStore } from "@/store";
 import themeColorData from "./themeColor.json";
 
 const setting = settingStore();
+
+// 检测是否为移动端（宽度小于768px或存在触摸设备特征）
+const isMobile = ref(false);
+const checkMobile = () => {
+  isMobile.value = window.innerWidth < 768 || "ontouchstart" in window;
+};
+checkMobile();
+window.addEventListener("resize", checkMobile);
 const osThemeRef = useOsTheme();
 const themeOverrides = ref(null);
 
@@ -58,11 +66,17 @@ const changeTheme = () => {
     themeColorMeta.setAttribute("content", "#ffffff");
     setCssVariable("--message-bg", "rgba(255, 255, 255, 0.72)");
     setCssVariable("--message-border", "rgba(0, 0, 0, 0.06)");
+    setCssVariable("--acrylic-bg", "rgba(255, 255, 255, 0.45)");
+    setCssVariable("--acrylic-border", "rgba(0, 0, 0, 0.04)");
+    setCssVariable("--layout-bg", "#fff");
   } else if (setting.getSiteTheme == "dark") {
     theme.value = darkTheme;
     themeColorMeta.setAttribute("content", "#18181c");
     setCssVariable("--message-bg", "rgba(48, 48, 51, 0.72)");
     setCssVariable("--message-border", "rgba(255, 255, 255, 0.08)");
+    setCssVariable("--acrylic-bg", "rgba(24, 24, 28, 0.45)");
+    setCssVariable("--acrylic-border", "rgba(255, 255, 255, 0.04)");
+    setCssVariable("--layout-bg", "#18181c");
   }
 };
 

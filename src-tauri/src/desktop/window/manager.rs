@@ -1,4 +1,4 @@
-use crate::window::config::WindowConfig;
+use crate::desktop::window::config::WindowConfig;
 use log::info;
 use tauri::window::EffectsBuilder;
 #[cfg(target_os = "windows")]
@@ -44,20 +44,24 @@ pub fn create_window(app: &AppHandle, config: &WindowConfig) -> Result<(), Strin
         .visible(config.visible)
         .shadow(config.shadow);
 
-    if let Some(min_w) = config.min_width {
-        if let Some(min_h) = config.min_height {
-            builder = builder.min_inner_size(min_w, min_h);
-        }
-    }
-
-    if let Some(max_w) = config.max_width {
-        if let Some(max_h) = config.max_height {
-            builder = builder.max_inner_size(max_w, max_h);
-        }
-    }
-
     if config.center {
         builder = builder.center();
+    }
+
+    // Apply min/max size constraints. Each dimension defaults to 0.0 if unset,
+    // allowing min_width and min_height to be specified independently.
+    if config.min_width.is_some() || config.min_height.is_some() {
+        builder = builder.min_inner_size(
+            config.min_width.unwrap_or(0.0),
+            config.min_height.unwrap_or(0.0),
+        );
+    }
+
+    if config.max_width.is_some() || config.max_height.is_some() {
+        builder = builder.max_inner_size(
+            config.max_width.unwrap_or(f64::MAX),
+            config.max_height.unwrap_or(f64::MAX),
+        );
     }
 
     // Handle parent window relationship for child windows
@@ -65,7 +69,10 @@ pub fn create_window(app: &AppHandle, config: &WindowConfig) -> Result<(), Strin
         if let Some(parent_window) = app.get_webview_window(parent_label) {
             builder = builder.parent(&parent_window).map_err(|e| e.to_string())?;
         } else {
-            return Err(format!("Parent window '{}' not found for '{}'", parent_label, label));
+            return Err(format!(
+                "Parent window '{}' not found for '{}'",
+                parent_label, label
+            ));
         }
     }
 

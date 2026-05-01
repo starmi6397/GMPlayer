@@ -22,7 +22,9 @@ export type SoundEventType =
   | "fade"
   | "loaderror"
   | "playerror"
-  | "progress";
+  | "progress"
+  | "stalled"
+  | "waiting";
 
 /**
  * Sound event callback function signature

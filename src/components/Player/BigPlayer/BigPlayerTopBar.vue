@@ -53,8 +53,11 @@ defineEmits<{
 <style lang="scss" scoped>
 .icon-menu {
   padding: 20px;
+  // On Tauri mobile (tablet ≥ 768px), push icons below the status-bar / notch.
+  // --app-safe-area-top is env(safe-area-inset-top) on Tauri mobile, 0px everywhere else.
+  padding-top: calc(var(--app-safe-area-top, 0px) + 20px);
   width: 100%;
-  height: 80px;
+  height: calc(80px + var(--app-safe-area-top, 0px));
   position: absolute;
   top: 0;
   left: 0;

@@ -311,7 +311,6 @@ const songLevelChange = () => {
       label: t("setting.higher"),
       value: "higher",
     },
-    ,
     {
       label: t("setting.exhigh"),
       value: "exhigh",

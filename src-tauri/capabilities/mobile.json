@@ -1,0 +1,17 @@
+{
+  "identifier": "mobile",
+  "description": "Permissions for mobile (Android / iOS) features",
+  "platforms": ["android", "iOS"],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "http:default",
+    "log:default",
+    "media-session:default",
+    "allow-set-orientation"
+  ]
+}

@@ -120,6 +120,7 @@ const startSpectrumUpdate = (sound: ISound, music: ReturnType<typeof musicStore>
   const settings = settingStore();
   const needsSpectrum = settings.musicFrequency;
   const needsLowFreq = settings.dynamicFlowSpeed;
+  const autoMix = getAutoMixEngine();
 
   const updateLoop = (): void => {
     if (!sound) {
@@ -128,7 +129,6 @@ const startSpectrumUpdate = (sound: ISound, music: ReturnType<typeof musicStore>
     }
 
     // AutoMix: monitor playback position per frame
-    const autoMix = getAutoMixEngine();
     autoMix.monitorPlayback(sound);
 
     // Skip spectrum computation when page is not visible
@@ -276,6 +276,8 @@ export const createSound = (
       sound.volume(music.persistData.playVolume);
     }
     SoundManager.setCurrentSound(sound);
+    // Mark the loading stage so the UI can show "Buffering…" instead of a generic spinner.
+    music.loadingStage = "buffering";
 
     // 更新取色
     getCoverColor(music.getPlaySongData.album.picUrl)
@@ -294,8 +296,29 @@ export const createSound = (
       fadePlayOrPause(sound, "play", music.persistData.playVolume);
     }
 
+    // ── Load timeout guard ────────────────────────────────────────────────────────
+    // If the audio element never fires "load" (e.g. hung network request), clear the
+    // stuck loading state after 15 s so the spinner doesn't stay forever.
+    let _loadClearTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      _loadClearTimeout = null;
+      if (music.isLoadingSong) {
+        console.warn("[createSound] Audio load timeout — force-clearing loading state");
+        music.isLoadingSong = false;
+        music.loadingStage = "idle";
+      }
+    }, 15_000);
+
+    const _clearLoadTimeout = (): void => {
+      if (_loadClearTimeout !== null) {
+        clearTimeout(_loadClearTimeout);
+        _loadClearTimeout = null;
+      }
+    };
+
     // 首次加载事件
     sound?.once("load", () => {
+      _clearLoadTimeout();
+      music.loadingStage = "idle";
       const songId = music.getPlaySongData?.id;
       const sourceId = music.getPlaySongData?.sourceId ? music.getPlaySongData.sourceId : 0;
       const isLogin = user.userLogin;
@@ -449,6 +472,8 @@ export const createSound = (
     });
     // 错误事件
     sound?.on("loaderror", () => {
+      _clearLoadTimeout();
+      music.loadingStage = "error";
       if (testNumber > 2) {
         window.$message.error(getLanguageData("songPlayError"));
         console.error(getLanguageData("songPlayError"));
@@ -466,10 +491,24 @@ export const createSound = (
       }
     });
     sound?.on("playerror", () => {
+      _clearLoadTimeout();
+      music.loadingStage = "error";
       window.$message.error(getLanguageData("songPlayError"));
       console.error(getLanguageData("songPlayError"));
       music.setPlayState(false);
       music.isLoadingSong = false;
+    });
+
+    // Stalled: network issue while buffering → surface it in the UI.
+    sound?.on("stalled", () => {
+      if (window.$player && window.$player !== sound) return;
+      music.loadingStage = "stalled";
+    });
+
+    // Waiting: data ran out mid-playback (rebuffering) → reset to buffering stage.
+    sound?.on("waiting", () => {
+      if (window.$player && window.$player !== sound) return;
+      if (music.isLoadingSong) music.loadingStage = "buffering";
     });
 
     // 返回音频对象

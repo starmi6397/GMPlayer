@@ -6,46 +6,53 @@
   <!-- Normal app layout -->
   <Provider v-else>
     <div :class="['app-body', music.showBigPlayer ? 'bigplayer-open' : '']">
-      <n-layout class="app-layout" style="height: 100vh">
-        <n-layout-header bordered>
-          <Nav />
-        </n-layout-header>
-        <n-layout-content
-          position="absolute"
-          :class="music.getPlaylists[0] && music.showPlayBar ? 'show' : ''"
-          :native-scrollbar="false"
-          embedded
-        >
-          <main
-            ref="mainContent"
-            class="main"
-            id="mainContent"
-            :class="{
-              playlist: music.showPlayList,
-              search: site.searchInputActive,
-            }"
+      <div
+        class="app-layout-wrapper"
+        :style="{ '--sidebar-width': setting.sidebarCollapsed ? '64px' : '240px' }"
+      >
+        <Sidebar />
+        <n-layout class="app-layout" style="height: 100vh">
+          <n-layout-header :data-tauri-drag-region="isTauri() || undefined">
+            <Nav />
+          </n-layout-header>
+          <n-layout-content
+            position="absolute"
+            :class="music.getPlaylists[0] && music.showPlayBar ? 'show' : ''"
+            :native-scrollbar="false"
+            embedded
           >
-            <n-back-top
-              :bottom="music.getPlaylists[0] && music.showPlayBar ? 100 : 40"
-              style="transition: all 0.3s; z-index: 999"
-            />
-            <router-view v-slot="{ Component, route }">
-              <transition name="fade-scale" mode="out-in">
-                <keep-alive :max="15">
-                  <component
-                    :is="Component"
-                    :key="
-                      (route.matched[0]?.path ?? route.path) +
-                      (route.query.id ? `_${route.query.id}` : '')
-                    "
-                  />
-                </keep-alive>
-              </transition>
-            </router-view>
-            <Player />
-          </main>
-        </n-layout-content>
-      </n-layout>
+            <main
+              ref="mainContent"
+              class="main"
+              id="mainContent"
+              :class="{
+                playlist: music.showPlayList,
+                search: site.searchInputActive,
+              }"
+            >
+              <n-back-top
+                :bottom="music.getPlaylists[0] && music.showPlayBar ? 100 : 40"
+                style="transition: all 0.3s; z-index: 999"
+              />
+              <router-view v-slot="{ Component, route }">
+                <transition name="fade-scale" mode="out-in">
+                  <keep-alive :max="15">
+                    <component
+                      :is="Component"
+                      :key="
+                        (route.matched[0]?.path ?? route.path) +
+                        (route.query.id ? `_${route.query.id}` : '')
+                      "
+                    />
+                  </keep-alive>
+                </transition>
+              </router-view>
+              <Player />
+            </main>
+          </n-layout-content>
+        </n-layout>
+      </div>
+      <MobileTabBar />
     </div>
     <TitleBar />
   </Provider>
@@ -64,6 +71,8 @@ import Provider from "@/components/Provider/index.vue";
 import Nav from "@/components/Nav/index.vue";
 import Player from "@/components/Player/index.vue";
 import TitleBar from "@/components/TitleBar/index.vue";
+import Sidebar from "@/components/Sidebar/index.vue";
+import MobileTabBar from "@/components/Sidebar/MobileTabBar.vue";
 import packageJson from "@/../package.json";
 import { ref, watch, computed, h } from "vue";
 
@@ -315,11 +324,17 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .n-layout-header {
-  height: 60px;
+  height: calc(54px + var(--app-safe-area-top, 0px));
   display: flex;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
+  background-color: var(--acrylic-bg, rgba(255, 255, 255, 0.45));
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--acrylic-border, rgba(0, 0, 0, 0.04));
+  position: relative;
+  z-index: 10;
 }
 
 .main-content {
@@ -334,11 +349,26 @@ onMounted(() => {
 }
 
 .n-layout-content {
-  top: 60px;
+  top: calc(54px + var(--app-safe-area-top, 0px));
   transition: all 0.3s;
+  background-color: transparent !important;
 
   &.show {
     bottom: 70px;
+
+    @media (max-width: 768px) {
+      // 70px player + 56px tab bar + safe-area-bottom (home indicator).
+      // --app-safe-area-bottom is env(safe-area-inset-bottom) on Tauri mobile,
+      // 0px everywhere else — so this calc is a no-op on desktop / browser.
+      bottom: calc(126px + var(--app-safe-area-bottom, 0px));
+    }
+  }
+
+  @media (max-width: 768px) {
+    &:not(.show) {
+      // 56px tab bar only + safe-area-bottom (home indicator).
+      bottom: calc(56px + var(--app-safe-area-bottom, 0px));
+    }
   }
 
   :deep(.n-scrollbar-rail--vertical) {
@@ -383,7 +413,7 @@ onMounted(() => {
 }
 
 // AMLL-style: .app-body is the outer wrapper (no transform → ::after position:fixed works)
-// .app-layout is the inner container that scales down
+// .app-layout-wrapper is the flexbox container that holds sidebar + content
 .app-body {
   height: 100vh;
   overflow: hidden;
@@ -410,7 +440,10 @@ onMounted(() => {
   }
 }
 
-.app-layout {
+.app-layout-wrapper {
+  display: flex;
+  height: 100vh;
+  background-color: var(--layout-bg, #fff);
   transition: scale 0.5s cubic-bezier(0.25, 1, 0.5, 1);
   scale: 1;
   transform-origin: center center;
@@ -420,5 +453,11 @@ onMounted(() => {
     border-radius: 0.75em;
     overflow: hidden;
   }
+}
+
+.app-layout {
+  flex: 1;
+  min-width: 0;
+  background-color: transparent !important;
 }
 </style>

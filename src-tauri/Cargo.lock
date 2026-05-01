@@ -1425,7 +1425,9 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 name = "gmplayer"
 version = "0.1.0"
 dependencies = [
+ "jni",
  "log",
+ "ndk-context",
  "parking_lot",
  "rpmalloc",
  "serde",
@@ -1435,6 +1437,7 @@ dependencies = [
  "tauri-plugin-decorum",
  "tauri-plugin-http",
  "tauri-plugin-log",
+ "tauri-plugin-media-session",
  "tauri-plugin-window-state",
  "tikv-jemallocator",
 ]
@@ -4304,6 +4307,17 @@ dependencies = [
  "tauri-plugin",
  "thiserror 2.0.18",
  "time",
+]
+
+[[package]]
+name = "tauri-plugin-media-session"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec0c8a8691d65110989d7ec433690242ecf1762ad35fa6fd7aa7f5d2699d8d05"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
 ]
 
 [[package]]

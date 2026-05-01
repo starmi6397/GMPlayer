@@ -360,14 +360,16 @@ defineExpose({ phonyBigCoverRef, phonySmallCoverRef, nameWrapperRef, nameTextRef
   min-width: 0;
   z-index: 2;
   text-shadow: 0 0 0.3em color-mix(in srgb, currentColor 15%, transparent);
-  padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+  // --app-safe-area-bottom is env(safe-area-inset-bottom) on Tauri mobile,
+  // 0px everywhere else — so this is a no-op on desktop / browser.
+  padding-bottom: calc(var(--app-safe-area-bottom, 0px) + 4rem);
 
   // 歌曲信息（展开）
   .mobile-song-info-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
+    margin-bottom: 20px;
 
     .mobile-song-info {
       flex: 1;

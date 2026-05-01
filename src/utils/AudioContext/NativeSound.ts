@@ -15,6 +15,7 @@ import type { SoundOptions, SoundEventType, SoundEventCallback, ISound } from ".
 
 // Development mode detection
 const IS_DEV = import.meta.env?.DEV ?? false;
+const EMPTY_U8 = new Uint8Array(0);
 
 /**
  * NativeSound - HTML5 Audio player with Web Audio API integration
@@ -226,12 +227,14 @@ export class NativeSound implements ISound {
       stalled: () => {
         if (this._unloading) return;
         console.warn("NativeSound: stalled - network issue");
+        this._emit("stalled");
       },
       waiting: () => {
         if (this._unloading) return;
         if (IS_DEV) {
           console.log("NativeSound: waiting for data");
         }
+        this._emit("waiting");
       },
       error: () => {
         if (this._unloading) return;
@@ -295,23 +298,25 @@ export class NativeSound implements ISound {
   private _emit(event: SoundEventType, ...args: unknown[]): void {
     const listeners = this._eventListeners.get(event);
     if (listeners) {
-      listeners.forEach((cb) => {
+      for (let i = 0; i < listeners.length; i++) {
+        const cb = listeners[i];
         try {
           cb(...args);
         } catch (e) {
           console.error(`NativeSound: Error in ${event} listener:`, e);
         }
-      });
+      }
     }
     const onceListeners = this._onceListeners.get(event);
     if (onceListeners) {
-      onceListeners.forEach((cb) => {
+      for (let i = 0; i < onceListeners.length; i++) {
+        const cb = onceListeners[i];
         try {
           cb(...args);
         } catch (e) {
           console.error(`NativeSound: Error in once ${event} listener:`, e);
         }
-      });
+      }
       this._onceListeners.delete(event);
     }
   }
@@ -528,7 +533,9 @@ export class NativeSound implements ISound {
    * @returns Uint8Array containing frequency data
    */
   getFrequencyData(): Uint8Array<ArrayBuffer> {
-    return this._effectManager ? this._effectManager.getFrequencyData() : new Uint8Array(0);
+    return this._effectManager
+      ? this._effectManager.getFrequencyData()
+      : (EMPTY_U8 as Uint8Array<ArrayBuffer>);
   }
 
   /**

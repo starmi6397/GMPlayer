@@ -18,6 +18,7 @@ import type { SoundOptions, SoundEventType, SoundEventCallback, ISound } from ".
 
 // Development mode detection
 const IS_DEV = import.meta.env?.DEV ?? false;
+const EMPTY_U8 = new Uint8Array(0);
 
 /**
  * BufferedSound - Downloads full audio, then delegates to NativeSound via Blob URL
@@ -101,29 +102,51 @@ export class BufferedSound implements ISound {
       } else {
         // Stream download with progress tracking
         const reader = response.body.getReader();
-        const chunks: Uint8Array[] = [];
         let received = 0;
+
+        // Fast-path: pre-allocate and fill when content-length is known.
+        // Falls back to chunk aggregation if the server sends more than declared.
+        let directView: Uint8Array | null = total > 0 ? new Uint8Array(total) : null;
+        let chunks: Uint8Array[] | null = directView ? null : [];
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          chunks.push(value);
+          if (directView) {
+            // Guard against incorrect content-length
+            if (received + value.length > directView.length) {
+              chunks = [directView.subarray(0, received), value];
+              directView = null;
+            } else {
+              directView.set(value, received);
+            }
+          } else {
+            chunks!.push(value);
+          }
+
           received += value.length;
 
-          if (total > 0) {
-            this._downloadProgress = received / total;
-            this._emitPre("progress", this._downloadProgress);
-          }
+          // total is non-zero in this branch; keep the same progress semantics.
+          this._downloadProgress = received / total;
+          this._emitPre("progress", this._downloadProgress);
         }
 
-        // Combine chunks
-        arrayBuffer = new ArrayBuffer(received);
-        const view = new Uint8Array(arrayBuffer);
-        let offset = 0;
-        for (const chunk of chunks) {
-          view.set(chunk, offset);
-          offset += chunk.length;
+        if (directView) {
+          // If the server ended early, slice down to actual received bytes
+          arrayBuffer =
+            received === directView.length
+              ? (directView.buffer as ArrayBuffer)
+              : (directView.slice(0, received).buffer as ArrayBuffer);
+        } else {
+          // Combine chunks
+          arrayBuffer = new ArrayBuffer(received);
+          const view = new Uint8Array(arrayBuffer);
+          let offset = 0;
+          for (const chunk of chunks!) {
+            view.set(chunk, offset);
+            offset += chunk.length;
+          }
         }
       }
 
@@ -343,7 +366,7 @@ export class BufferedSound implements ISound {
   }
 
   getFrequencyData(): Uint8Array<ArrayBuffer> {
-    return this._inner?.getFrequencyData() ?? new Uint8Array(0);
+    return this._inner?.getFrequencyData() ?? (EMPTY_U8 as Uint8Array<ArrayBuffer>);
   }
 
   getFFTData(): number[] {

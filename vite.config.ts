@@ -130,6 +130,7 @@ export default defineConfig(({ mode }) => {
     build: {
       target: "esnext",
       minify: isTauriDebug ? false : "oxc",
+      cssMinify: !isTauriDebug,
       sourcemap: isTauriDebug,
       rolldownOptions: {
         input: {
@@ -145,7 +146,7 @@ export default defineConfig(({ mode }) => {
               },
             },
           }),
-          advancedChunks: {
+          codeSplitting: {
             groups: [
               // Vue core framework
               {

@@ -62,15 +62,18 @@
                       "
                       :key="'yrc-' + music.getPlaySongLyricIndex"
                       class="lrc text-hidden"
+                      :depth="3"
                     >
-                      <n-text
-                        v-for="item in music.getPlaySongLyric.yrc[music.getPlaySongLyricIndex]
-                          .content"
-                        :key="item"
-                        :depth="3"
-                      >
-                        {{ item.content }}
-                      </n-text>
+                      <span ref="lrcScrollRef" class="lrc-scroll-content" :style="lrcScrollStyle">
+                        <span
+                          v-for="item in music.getPlaySongLyric.yrc[music.getPlaySongLyricIndex]
+                            .content"
+                          :key="item.time"
+                          class="lrc-word"
+                        >
+                          {{ item.content }}
+                        </span>
+                      </span>
                     </n-text>
                     <n-text
                       v-else-if="
@@ -80,7 +83,9 @@
                       class="lrc text-hidden"
                       :depth="3"
                     >
-                      {{ music.getPlaySongLyric.lrc[music.getPlaySongLyricIndex]?.content }}
+                      <span ref="lrcScrollRef" class="lrc-scroll-content" :style="lrcScrollStyle">
+                        {{ music.getPlaySongLyric.lrc[music.getPlaySongLyricIndex]?.content }}
+                      </span>
                     </n-text>
                     <AllArtists
                       v-else
@@ -267,7 +272,8 @@
 </template>
 
 <script setup>
-import { getMusicUrl, getMusicNumUrl, getMusicDetail, getUnifiedLyric } from "@/api/song";
+import { getMusicDetail } from "@/api/song";
+import { resolveSongUrl } from "@/utils/AudioContext/resolveSongUrl";
 import { Motion, AnimatePresence } from "motion-v";
 import { NIcon } from "naive-ui";
 import {
@@ -312,8 +318,9 @@ import AllArtists from "@/components/DataList/AllArtists.vue";
 import BigPlayer from "./BigPlayer/index.vue";
 import "vue-slider-component/theme/default.css";
 import { watch, toRaw } from "vue";
-import { parseLyricData as parseLyric, formatAsLrc as formatToLrc } from "@/utils/LyricsProcessor";
+import { parseLyricData as parseLyric } from "@/utils/LyricsProcessor";
 import { preprocessLyrics, getProcessedLyrics } from "@/utils/LyricsProcessor";
+import { lyricFetcher } from "@/utils/lyricFetcher";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -323,12 +330,10 @@ const listenTogether = listenTogetherStore();
 const { persistData } = storeToRefs(music);
 const addPlayListRef = ref(null);
 const PlayListDrawerRef = ref(null);
+const lrcScrollRef = ref(null);
 
 // 一起听歌模态框
 const showListenTogetherModal = ref(false);
-
-// UNM 是否存在
-const useUnmServerHas = import.meta.env.VITE_UNM_API ? true : false;
 
 // 音频标签
 const player = ref(null);
@@ -339,7 +344,7 @@ const player = ref(null);
 let _songLoadGeneration = 0;
 
 // 获取歌曲播放数据
-const getPlaySongData = (data, level = setting.songLevel) => {
+const getPlaySongData = async (data, level = setting.songLevel) => {
   const generation = ++_songLoadGeneration;
   try {
     if (!data || !data.id) {
@@ -376,50 +381,24 @@ const getPlaySongData = (data, level = setting.songLevel) => {
       return;
     }
 
-    // VIP 歌曲或需要购买专辑
-    if (useUnmServerHas && setting.useUnmServer && !pc && (fee === 1 || fee === 4)) {
-      console.log("[Player] Attempting UNM server for VIP/paid song.");
-      getMusicNumUrlData(id, generation);
+    // Unified URL resolution (NCM + trial detection + UNM fallback + kuwo proxy)
+    const result = await resolveSongUrl({ id, fee, pc, name: data.name }, level);
+    if (generation !== _songLoadGeneration) return; // stale check
+
+    if (result) {
+      console.log(`[Player] Creating sound instance with ${result.source} URL: ${result.url}`);
+      player.value = createSound(result.url);
+    } else {
+      console.warn(`[Player] No URL resolved for ${id}`);
+      $message.warning(t("general.message.playError"));
+      music.setPlaySongIndex("next");
     }
-    // 免费或无版权 — fetch URL directly (avoids checkMusicCanUse race condition
-    // where the login session may not be established yet on page reload, causing
-    // the availability check to fail and all songs to fallback to UNM).
-    else {
-      console.log(`[Player] Fetching official URL directly for ${id}.`);
-      getMusicUrl(id, level)
-        .then((res) => {
-          if (generation !== _songLoadGeneration) return;
-          console.log(`[Player] getMusicUrl response for ${id}:`, res);
-          if (res.data && res.data[0] && res.data[0].url) {
-            const url = res.data[0].url.replace(/^http:/, "https:");
-            console.log(`[Player] Creating sound instance with official URL: ${url}`);
-            player.value = createSound(url);
-          } else {
-            console.warn(`[Player] No official URL for ${id}, trying UNM fallback.`);
-            if (useUnmServerHas && setting.useUnmServer) {
-              getMusicNumUrlData(id, generation);
-            } else {
-              $message.warning(t("general.message.playError"));
-              music.setPlaySongIndex("next");
-            }
-          }
-        })
-        .catch((err) => {
-          if (generation !== _songLoadGeneration) return;
-          console.error(`[Player] Error fetching official URL for ${id}:`, err);
-          if (useUnmServerHas && setting.useUnmServer) {
-            console.warn(`[Player] Official URL fetch failed for ${id}, falling back to UNM.`);
-            getMusicNumUrlData(id, generation);
-          } else {
-            $message.warning(t("general.message.playError"));
-            music.setPlaySongIndex("next");
-          }
-        });
-    }
-    // 获取歌词 (using the new unified function)
+
+    // 获取歌词
     fetchAndParseLyric(id);
   } catch (err) {
-    console.error("[Player] Error in getPlaySongData main block:", err);
+    if (generation !== _songLoadGeneration) return;
+    console.error("[Player] Error in getPlaySongData:", err);
     if (music.getPlaylists[0] && music.getPlayState) {
       $message.warning(t("general.message.playError"));
       music.setPlaySongIndex("next");
@@ -440,39 +419,6 @@ const renderIcon = (icon) => {
   };
 };
 
-// 网易云解灰
-const getMusicNumUrlData = (id, generation) => {
-  console.log(`[Player] getMusicNumUrlData called for ID: ${id}`);
-  getMusicNumUrl(id)
-    .then((res) => {
-      if (generation !== _songLoadGeneration) return;
-      console.log(`[Player] getMusicNumUrl response for ${id}:`, res);
-      if (res.code === 200 && res.data && res.data.url) {
-        const songUrl = res.data.url.replace(/^http:/, "");
-        // 匹配酷我域名
-        const pattern = /kuwo\\.cn/i;
-        if (pattern.test(songUrl) && res.data?.proxyUrl) {
-          const proxyUrl = res.data.proxyUrl; // Assuming proxyUrl doesn't need https replace
-          console.log(`[Player] Creating sound instance with UNM Proxy URL: ${proxyUrl}`);
-          player.value = createSound(proxyUrl);
-        } else {
-          console.log(`[Player] Creating sound instance with UNM URL: ${songUrl}`);
-          player.value = createSound(songUrl);
-        }
-      } else {
-        console.error(`[Player] Invalid data from getMusicNumUrl for ${id}:`, res);
-        $message.warning(t("general.message.playError"));
-        music.setPlaySongIndex("next");
-      }
-    })
-    .catch((err) => {
-      if (generation !== _songLoadGeneration) return;
-      console.error(`[Player] Error in getMusicNumUrl request for ${id}:`, err);
-      $message.warning(t("general.message.playError"));
-      music.setPlaySongIndex("next");
-    });
-};
-
 // 歌曲进度条更新
 const sliderDragEnd = () => {
   songTimeSliderUpdate(music.getPlaySongTime.barMoveDistance);
@@ -482,8 +428,8 @@ const songTimeSliderUpdate = (val) => {
   if (player.value && music.getPlaySongTime?.duration) {
     const currentTime = (music.getPlaySongTime.duration / 100) * val;
     setSeek(player.value, currentTime);
-    // 一起听歌：房主发送进度跳转命令
-    if (listenTogether.isHost) {
+    // 一起听歌：发送进度跳转命令（房主和房客均可）
+    if (listenTogether.isInRoom) {
       listenTogether.sendPlayCommand("seek", Math.floor(currentTime * 1000));
     }
   }
@@ -881,11 +827,13 @@ watch(
       songChange(val);
       broadcastPlayerState();
 
-      // 一起听歌：房主发送切歌命令
-      if (listenTogether.isHost && val?.id && !listenTogether.isProcessingRemoteCommand) {
+      // 一起听歌：发送切歌命令（房主和房客均可）
+      if (listenTogether.isInRoom && val?.id && !listenTogether.isProcessingRemoteCommand) {
         listenTogether.sendPlayCommand("GOTO");
-        // 同步播放列表
-        listenTogether.syncCurrentPlaylist();
+        // 仅房主同步播放列表
+        if (listenTogether.isHost) {
+          listenTogether.syncCurrentPlaylist();
+        }
       }
 
       // Update tray tooltip with current song info
@@ -931,8 +879,8 @@ watch(
         lyricIndex: music.playSongLyricIndex,
       });
     }
-    // 一起听歌：房主发送播放状态同步
-    if (listenTogether.isHost && !listenTogether.isProcessingRemoteCommand) {
+    // 一起听歌：发送播放状态同步（房主和房客均可）
+    if (listenTogether.isInRoom && !listenTogether.isProcessingRemoteCommand) {
       listenTogether.sendPlayCommand(val ? "PLAY" : "PAUSE");
     }
     nextTick().then(() => {
@@ -1039,34 +987,134 @@ watch(
   },
 );
 
-const fetchAndParseLyric = (id) => {
-  const useTTMLRepo = setting.useTTMLRepo;
-
-  getUnifiedLyric(id, useTTMLRepo)
-    .then((lyricData) => {
-      console.log(
-        `[Player] Unified Lyric data received for ${id} (using TTML repo: ${useTTMLRepo})`,
-      );
-
-      const parsedResult = parseLyric(lyricData);
-      console.log(`[Player] Parsed lyric result for ${id}`);
-
-      // 将解析后的歌词转换为标准LRC格式
-      const formattedLrc = formatToLrc(parsedResult);
-      console.log(`[Player] Formatted LRC for ${id}`);
-
-      // 添加格式化后的LRC到结果中
-      parsedResult.formattedLrc = formattedLrc;
-
-      music.setPlaySongLyric(parsedResult);
-    })
-    .catch((err) => {
-      console.error(`[Player] Failed to get unified lyric for ${id}:`, err);
-      const defaultResult = parseLyric(null);
-      defaultResult.formattedLrc = ""; // 确保默认结果也有formattedLrc字段
-      music.setPlaySongLyric(defaultResult);
-    });
+const fetchAndParseLyric = async (id) => {
+  try {
+    const { result, stale } = await lyricFetcher.fetchLyric(id);
+    if (stale) {
+      console.log(`[Player] Lyric fetch for ${id} is stale, discarding`);
+      return;
+    }
+    music.setPlaySongLyric(result);
+  } catch (err) {
+    console.error(`[Player] Failed to fetch lyric for ${id}:`, err);
+    const defaultResult = parseLyric(null);
+    defaultResult.formattedLrc = "";
+    music.setPlaySongLyric(defaultResult);
+  }
 };
+
+// 歌词滚动逻辑：按播放进度水平滚动，避免挤占其他布局区域
+// 借鉴 DesktopLyrics 的实现：.lrc-scroll-content 作为 inline-block 在 .lrc 容器内滚动
+const lrcScrollStyle = ref({});
+
+const updateLrcScroll = () => {
+  const scrollEl = lrcScrollRef.value;
+  if (!scrollEl) return;
+
+  // scrollEl 是 .lrc-scroll-content，它的父元素是 .lrc (n-text)
+  const containerEl = scrollEl.parentElement;
+  if (!containerEl) return;
+
+  const containerWidth = containerEl.clientWidth;
+  const scrollWidth = scrollEl.scrollWidth;
+
+  // 如果内容没有溢出，不需要滚动
+  if (scrollWidth <= containerWidth) {
+    lrcScrollStyle.value = {};
+    return;
+  }
+
+  const lyric = music.getPlaySongLyric;
+  const index = music.getPlaySongLyricIndex;
+  const currentTime = music.getPlaySongTime.currentTime;
+
+  if (!lyric || index === -1) return;
+
+  let progress = 0;
+
+  // YRC 逐字歌词：按当前字的时间进度计算
+  if (setting.showYrc && lyric.hasYrc && lyric.yrc?.[index]?.content?.length) {
+    const yrcLine = lyric.yrc[index];
+    const words = yrcLine.content;
+    const lineStart = yrcLine.time;
+    const lineEnd = yrcLine.endTime || words[words.length - 1]?.endTime || lineStart + 5;
+    const lineDuration = lineEnd - lineStart;
+
+    if (lineDuration > 0) {
+      // 找到当前正在播放的字，计算累计进度
+      for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        if (currentTime >= w.endTime) {
+          // 这个字已播完
+          progress = (w.endTime - lineStart) / lineDuration;
+        } else if (currentTime >= w.time && currentTime < w.endTime) {
+          // 当前正在播放这个字
+          const wordElapsed = currentTime - w.time;
+          const wordProgress = w.duration > 0 ? wordElapsed / w.duration : 1;
+          progress = (w.time - lineStart + wordProgress * (w.endTime - w.time)) / lineDuration;
+          break;
+        }
+      }
+      progress = Math.min(1, Math.max(0, progress));
+    }
+  } else if (lyric.lrc?.[index]) {
+    // 普通 LRC：按行内时间进度计算
+    const lrcLine = lyric.lrc[index];
+    const lineStart = lrcLine.time;
+    // 尝试获取下一行的时间作为结束时间
+    const nextLine = lyric.lrc[index + 1];
+    const lineEnd = nextLine ? nextLine.time : lineStart + 5;
+    const lineDuration = lineEnd - lineStart;
+
+    if (lineDuration > 0) {
+      progress = Math.min(1, Math.max(0, (currentTime - lineStart) / lineDuration));
+    }
+  }
+
+  // 计算滚动偏移：总溢出宽度 * 进度
+  // 起始停顿：前 30% 进度保持不滚动，让文字在开头停留一段时间
+  const scrollStartProgress = 0.3;
+  let scrollProgress = 0;
+  if (progress > scrollStartProgress) {
+    scrollProgress = (progress - scrollStartProgress) / (1 - scrollStartProgress);
+  }
+  scrollProgress = Math.min(1, Math.max(0, scrollProgress));
+
+  const overflow = scrollWidth - containerWidth;
+  const offset = overflow * scrollProgress;
+
+  lrcScrollStyle.value = {
+    transform: `translateX(-${offset}px)`,
+    transition: "transform 0.1s linear",
+  };
+};
+
+// 监听歌词索引变化，重置滚动位置
+watch(
+  () => music.getPlaySongLyricIndex,
+  () => {
+    lrcScrollStyle.value = {};
+    nextTick(() => {
+      updateLrcScroll();
+    });
+  },
+);
+
+// 监听播放时间变化，更新歌词滚动
+watch(
+  () => music.getPlaySongTime.currentTime,
+  () => {
+    updateLrcScroll();
+  },
+);
+
+// 监听播放时间变化，更新歌词滚动
+watch(
+  () => music.getPlaySongTime.currentTime,
+  () => {
+    updateLrcScroll();
+  },
+);
 </script>
 
 <style lang="scss" scoped>
@@ -1083,7 +1131,7 @@ const fetchAndParseLyric = (id) => {
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fade-enter-from,
@@ -1095,8 +1143,25 @@ const fetchAndParseLyric = (id) => {
   height: 70px;
   position: fixed;
   bottom: 0;
-  left: 0;
+  left: var(--sidebar-width, 240px);
+  width: calc(100% - var(--sidebar-width, 240px));
   z-index: 2;
+  transition:
+    left 0.3s ease,
+    width 0.3s ease;
+
+  // Acrylic background — override Naive UI card bg
+  background-color: var(--acrylic-bg, rgba(255, 255, 255, 0.45)) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--acrylic-border, rgba(0, 0, 0, 0.04));
+
+  // Mobile: player sits above tab bar, no sidebar
+  @media (max-width: 768px) {
+    bottom: 56px;
+    left: 0;
+    width: 100%;
+  }
 
   .slider {
     position: absolute;
@@ -1175,6 +1240,8 @@ const fetchAndParseLyric = (id) => {
       display: flex;
       flex-direction: row;
       align-items: center;
+      min-width: 0;
+      overflow: hidden;
 
       .pic {
         width: 50px;
@@ -1221,6 +1288,9 @@ const fetchAndParseLyric = (id) => {
       }
 
       .name {
+        min-width: 0;
+        overflow: hidden;
+
         .song {
           font-size: 16px;
           font-weight: bold;
@@ -1235,6 +1305,24 @@ const fetchAndParseLyric = (id) => {
         .artisrOrLrc {
           font-size: 12px;
           margin-top: 2px;
+          overflow: hidden;
+
+          .lrc {
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+
+            .lrc-scroll-content {
+              display: inline-block;
+              white-space: nowrap;
+              transition: transform 0.1s linear;
+              will-change: transform;
+            }
+
+            .lrc-word {
+              display: inline;
+            }
+          }
         }
       }
     }

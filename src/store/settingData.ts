@@ -78,6 +78,8 @@ interface SettingDataState {
   lyricTimeOffset: number;
   // Close behavior for Tauri desktop app
   closeBehavior: "ask" | "tray" | "exit";
+  // Sidebar collapsed state
+  sidebarCollapsed: boolean;
 }
 
 const useSettingDataStore = defineStore("settingData", {
@@ -148,6 +150,8 @@ const useSettingDataStore = defineStore("settingData", {
       lyricTimeOffset: 0,
       // Close behavior (Tauri): 'ask' | 'tray' | 'exit'
       closeBehavior: "ask",
+      // Sidebar collapsed state
+      sidebarCollapsed: false,
     };
   },
   getters: {

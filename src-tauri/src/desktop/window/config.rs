@@ -128,7 +128,7 @@ impl WindowConfig {
             closeable_to_tray: true,
             use_overlay_titlebar: true,
             traffic_lights_inset: Some((12.0, 16.0)),
-            window_effect: None,
+            window_effect: Some("acrylic".into()),
             shadow: true,
             additional_args: Some(DEFAULT_ADDTIONAL_WINDOW_ARGS.to_owned()),
             parent_label: None,
@@ -160,7 +160,7 @@ impl WindowConfig {
             traffic_lights_inset: None,
             window_effect: Some("acrylic".into()),
             shadow: true,
-            additional_args: None,
+            additional_args: Some(DEFAULT_ADDTIONAL_WINDOW_ARGS.to_owned()),
             parent_label: None,
         }
     }
@@ -190,7 +190,7 @@ impl WindowConfig {
             traffic_lights_inset: None,
             window_effect: None,
             shadow: false,
-            additional_args: None,
+            additional_args: Some(DEFAULT_ADDTIONAL_WINDOW_ARGS.to_owned()),
             parent_label: None,
         }
     }
@@ -220,7 +220,7 @@ impl WindowConfig {
             traffic_lights_inset: None,
             window_effect: None,
             shadow: false,
-            additional_args: None,
+            additional_args: Some(DEFAULT_ADDTIONAL_WINDOW_ARGS.to_owned()),
             parent_label: Some("desktop-lyrics".into()),
         }
     }
@@ -250,7 +250,7 @@ impl WindowConfig {
             traffic_lights_inset: Some((12.0, 16.0)),
             window_effect: None,
             shadow: true,
-            additional_args: None,
+            additional_args: Some(DEFAULT_ADDTIONAL_WINDOW_ARGS.to_owned()),
             parent_label: None,
         }
     }
@@ -280,7 +280,7 @@ impl WindowConfig {
             traffic_lights_inset: Some((12.0, 16.0)),
             window_effect: None,
             shadow: true,
-            additional_args: None,
+            additional_args: Some(DEFAULT_ADDTIONAL_WINDOW_ARGS.to_owned()),
             parent_label: None,
         }
     }

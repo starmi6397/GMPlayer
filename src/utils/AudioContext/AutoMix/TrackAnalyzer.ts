@@ -82,6 +82,20 @@ export interface IntroAnalysis {
   multibandEnergy: { low: number[]; mid: number[]; high: number[] } | null;
 }
 
+export interface Phrase {
+  start: number;
+  end: number;
+  index: number;
+}
+
+export interface PhraseAnalysis {
+  phrases: Phrase[];
+  /** Suggested mix-out phrase (outro → intro transition point) */
+  mixOutPhrase: Phrase | null;
+  /** Suggested mix-in phrase for incoming track */
+  mixInPhrase: Phrase | null;
+}
+
 export interface TrackAnalysis {
   volume: VolumeAnalysis;
   energy: EnergyAnalysis;
@@ -89,6 +103,7 @@ export interface TrackAnalysis {
   fingerprint: SpectralFingerprint;
   outro: OutroAnalysis | null;
   intro: IntroAnalysis | null;
+  phrases: PhraseAnalysis | null;
   duration: number;
 }
 
@@ -357,6 +372,7 @@ async function analyzeOnMainThread(
 
   // BPM skipped in fallback — too expensive for main thread
   // Fingerprint skipped in fallback — not critical
+  // Phrases skipped in fallback — requires BPM
   return {
     volume,
     energy,
@@ -364,6 +380,7 @@ async function analyzeOnMainThread(
     fingerprint: { bands: new Array(24).fill(0) },
     outro: null,
     intro,
+    phrases: null,
     duration,
   };
 }

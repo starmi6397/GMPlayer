@@ -4,7 +4,7 @@ import { getSongTime, getSongPlayingTime } from "@/utils/timeTools";
 import { getPersonalFm, setFmTrash } from "@/api/home";
 import { getLikelist, setLikeSong } from "@/api/user";
 import { getPlayListCatlist } from "@/api/playlist";
-import { getMusicUrl } from "@/api/song";
+import { resolveSongUrl } from "@/utils/AudioContext/resolveSongUrl";
 import { userStore, settingStore } from "@/store";
 import { NIcon } from "naive-ui";
 import { PlayCycle, PlayOnce, ShuffleOne } from "@icon-park/vue-next";
@@ -101,6 +101,7 @@ interface MusicDataState {
   spectrumsScaleData: number;
   lowFreqVolume: number;
   isLoadingSong: boolean;
+  loadingStage: "idle" | "resolving" | "buffering" | "stalled" | "error";
   preloadedSongIds: Set<number>;
   autoMixState: AutoMixStateData;
   persistData: PersistData;
@@ -137,6 +138,7 @@ const useMusicDataStore = defineStore("musicData", {
       spectrumsScaleData: 1,
       lowFreqVolume: 0,
       isLoadingSong: false,
+      loadingStage: "idle",
       preloadedSongIds: new Set(),
       autoMixState: {
         phase: "idle",
@@ -180,6 +182,9 @@ const useMusicDataStore = defineStore("musicData", {
     },
     getLoadingState(state): boolean {
       return state.isLoadingSong;
+    },
+    getLoadingStage(state): "idle" | "resolving" | "buffering" | "stalled" | "error" {
+      return state.loadingStage;
     },
     getDailySongs(state): SongData[] {
       return state.dailySongsData;
@@ -289,17 +294,16 @@ const useMusicDataStore = defineStore("musicData", {
       console.log("即将并行预加载歌曲:", songsToPreload.map((s) => s.name).join(", "));
 
       const urlPromises = songsToPreload.map((songData) =>
-        getMusicUrl(songData.id)
-          .then((res: any) => {
-            const url = res.data[0]?.url?.replace(/^http:/, "https:");
-            if (!url) {
+        resolveSongUrl(songData)
+          .then((result) => {
+            if (!result) {
               console.warn(`${songData.name} 无法获取 URL，跳过预加载`);
               return null;
             }
             return {
               id: songData.id,
               name: songData.name,
-              url,
+              url: result.url,
             };
           })
           .catch((err: any) => {
@@ -845,6 +849,7 @@ const useMusicDataStore = defineStore("musicData", {
 
     setLoadingState(state: boolean) {
       this.isLoadingSong = state;
+      if (!state) this.loadingStage = "idle";
     },
   },
   persist: [

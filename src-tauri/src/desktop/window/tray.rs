@@ -3,8 +3,8 @@ use tauri::image::Image;
 use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, Rect};
 
-use crate::window::config::WindowConfig;
-use crate::window::manager as wm;
+use crate::desktop::window::config::WindowConfig;
+use crate::desktop::window::manager as wm;
 
 const TRAY_ID: &str = "main";
 
